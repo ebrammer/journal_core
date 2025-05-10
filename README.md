@@ -99,10 +99,3 @@ If you find a bug or something doesn't work inside FlutterFlow, please [open an 
 ## 📜 License
 
 MIT © 2024–2025 Evan Brammer
-
-```
-
----
-
-Would you like a matching `CHANGELOG.md` template or GitHub release guide next?
-```
