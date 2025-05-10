@@ -1,39 +1,108 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+Absolutely — here’s a cleaned-up, accurate version of your `README.md` for the `journal_core` package, based on what you’re actually building:
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+---
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
+````md
+# journal_core
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+A reusable, modular content editor for Flutter and FlutterFlow, built on top of [AppFlowy Editor](https://github.com/AppFlowy-IO/appflowy_editor).  
+Designed to support structured journal-like documents with rich block-based content, styling, and embedded metadata.
 
-## Features
+---
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+## ✨ Features
 
-## Getting started
+- 📚 **Block-based architecture**: Headings, paragraphs, quotes, dividers, lists, prayers, scripture, tags, and more
+- 🎨 **Rich text styling**: Inline styles (bold, italic, underline, strikethrough)
+- 🧩 **Custom blocks**: Built-in support for Scripture and Prayer blocks
+- 🧰 **Configurable toolbar**: Floating editor toolbar with smart mode-switching
+- 🔁 **Sync-ready**: Built with SQLite and Supabase compatibility in mind
+- 📦 **FlutterFlow-friendly**: Designed for seamless integration as a custom widget or GitHub dependency
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+---
 
-## Usage
+## 🚀 Getting Started
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
+Add `journal_core` to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  journal_core:
+    git:
+      url: https://github.com/ebrammer/journal_core.git
+```
+````
+
+Then import it:
 
 ```dart
-const like = 'sample';
+import 'package:journal_core/journal_core.dart';
 ```
 
-## Additional information
+---
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+## 🧪 Example Usage
+
+```dart
+EditorWidget(
+  title: 'My Journal',
+  createdAt: DateTime.now().millisecondsSinceEpoch,
+  lastModified: DateTime.now().millisecondsSinceEpoch,
+  content: '{}', // Pass a valid AppFlowy document JSON string
+  onSave: (json) {
+    // Save or sync the updated content
+  },
+)
+```
+
+---
+
+## 📁 Folder Structure
+
+```
+lib/
+├── journal_core.dart               # Public API exports
+└── src/
+    ├── blocks/                     # Custom block builders
+    ├── editor/                     # Editor state + controller
+    ├── models/                     # Data models (BlockType, Journal, etc.)
+    ├── toolbar/                    # Toolbar buttons, state, and actions
+    ├── utils/                      # Delta parsing, focus helpers, logging
+    └── widgets/                    # Editor + metadata widgets
+```
+
+---
+
+## 🧠 Philosophy
+
+This package is built for:
+
+- **Faith-based journaling**
+- **Block-style flexibility**
+- **Full control inside FlutterFlow**
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions!
+To propose changes or custom blocks, open an issue or pull request.
+
+---
+
+## 🐞 Issues
+
+If you find a bug or something doesn't work inside FlutterFlow, please [open an issue](https://github.com/ebrammer/journal_core/issues) with reproduction steps and context.
+
+---
+
+## 📜 License
+
+MIT © 2024–2025 Evan Brammer
+
+```
+
+---
+
+Would you like a matching `CHANGELOG.md` template or GitHub release guide next?
+```
