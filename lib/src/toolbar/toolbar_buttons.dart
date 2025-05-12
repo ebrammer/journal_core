@@ -7,14 +7,14 @@ import 'package:journal_core/journal_core.dart';
 class ToolbarButtonConfig {
   final IconData icon;
   final VoidCallback? onPressed;
-  final bool isActive;
+  final bool Function()? isActive;
   final String key;
 
   ToolbarButtonConfig({
     required this.icon,
     required this.key,
     this.onPressed,
-    this.isActive = false,
+    this.isActive,
   });
 }
 
@@ -37,6 +37,7 @@ class ToolbarButtons {
       BulletedListBlockKeys.type,
       NumberedListBlockKeys.type
     ].contains(toolbarState.currentBlockType);
+
     final isTopLevel = toolbarState.currentSelectionPath != null &&
         toolbarState.currentSelectionPath!.length == 1;
     final isChildNode = toolbarState.currentSelectionPath != null &&
@@ -53,7 +54,8 @@ class ToolbarButtons {
         icon: _getHeadingIcon(),
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleCycleHeading(),
-        isActive: toolbarState.currentBlockType == HeadingBlockKeys.type ||
+        isActive: () =>
+            toolbarState.currentBlockType == HeadingBlockKeys.type ||
             toolbarState.currentBlockType == BlockType.paragraph.name,
       ),
       ToolbarButtonConfig(
@@ -61,28 +63,29 @@ class ToolbarButtons {
         icon: _getListIcon(),
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleCycleList(),
-        isActive: isListBlock,
+        isActive: () => isListBlock,
       ),
       if (isListBlock)
         ToolbarButtonConfig(
           key: 'outdent',
           icon: AppIcons.ktextOutdent,
           onPressed: isChildNode ? () => actions.handleOutdent() : null,
-          isActive: isChildNode, // Activate if nested
+          isActive: () => isChildNode, // Activate if nested
         ),
       if (isListBlock)
         ToolbarButtonConfig(
           key: 'indent',
           icon: AppIcons.ktextIndent,
           onPressed: prevIsListBlock ? () => actions.handleIndent() : null,
-          isActive: prevIsListBlock, // Activate if previous sibling is a list
+          isActive: () =>
+              prevIsListBlock, // Activate if previous sibling is a list
         ),
       ToolbarButtonConfig(
         key: 'quote',
         icon: AppIcons.kalignLeftSimple,
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleInsertQuote(),
-        isActive: toolbarState.currentBlockType == 'quote',
+        isActive: () => toolbarState.currentBlockType == 'quote',
       ),
       if (!isListBlock)
         ToolbarButtonConfig(
@@ -96,7 +99,7 @@ class ToolbarButtons {
         key: 'drag',
         icon: AppIcons.kswap,
         onPressed: () => toolbarState.isDragMode = !toolbarState.isDragMode,
-        isActive: toolbarState.isDragMode,
+        isActive: () => toolbarState.isDragMode,
       ),
       ToolbarButtonConfig(
         key: 'undo',
@@ -125,13 +128,13 @@ class ToolbarButtons {
       ToolbarButtonConfig(
         key: 'insert_below',
         icon: AppIcons.krowsPlusBottom,
-        onPressed: () => actions.handleInsertParagraphBelow(),
+        onPressed: () => actions.handleInsertBelow(),
       ),
       ToolbarButtonConfig(
         key: 'divider',
         icon: AppIcons.kminus,
         onPressed: () => actions.handleInsertDivider(),
-        isActive: toolbarState.currentBlockType == 'divider',
+        isActive: () => toolbarState.currentBlockType == 'divider',
       ),
     ];
   }
@@ -142,25 +145,25 @@ class ToolbarButtons {
         key: 'bold',
         icon: AppIcons.ktextB,
         onPressed: () => actions.handleToggleStyle('bold'),
-        isActive: toolbarState.isStyleBold,
+        isActive: () => toolbarState.isStyleBold,
       ),
       ToolbarButtonConfig(
         key: 'italic',
         icon: AppIcons.ktextItalic,
         onPressed: () => actions.handleToggleStyle('italic'),
-        isActive: toolbarState.isStyleItalic,
+        isActive: () => toolbarState.isStyleItalic,
       ),
       ToolbarButtonConfig(
         key: 'underline',
         icon: AppIcons.ktextUnderline,
         onPressed: () => actions.handleToggleStyle('underline'),
-        isActive: toolbarState.isStyleUnderline,
+        isActive: () => toolbarState.isStyleUnderline,
       ),
       ToolbarButtonConfig(
         key: 'strikethrough',
         icon: AppIcons.ktextStrikethrough,
         onPressed: () => actions.handleToggleStyle('strikethrough'),
-        isActive: toolbarState.isStyleStrikethrough,
+        isActive: () => toolbarState.isStyleStrikethrough,
       ),
     ];
   }

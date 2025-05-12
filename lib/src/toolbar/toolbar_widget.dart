@@ -2,10 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:journal_core/src/icons/journal_icons.dart';
-import 'package:journal_core/src/editor/journal_editor_controller.dart';
-import 'toolbar.dart';
+
 import 'package:provider/provider.dart';
+import 'package:journal_core/journal_core.dart';
 
 class JournalToolbar extends StatefulWidget {
   const JournalToolbar({
@@ -56,12 +55,18 @@ class _JournalToolbarState extends State<JournalToolbar> {
   Widget build(BuildContext context) {
     _toolbarState = context.watch<ToolbarState>();
 
-    if (!_toolbarState.isVisible) return const SizedBox.shrink();
+    if (!_toolbarState.isVisible) {
+      Log.info('🔧 Toolbar: Not visible');
+      return const SizedBox.shrink();
+    }
 
     final isSubMenu = _toolbarState.showTextStyles ||
         _toolbarState.showInsertMenu ||
         _toolbarState.showLayoutMenu ||
         _toolbarState.isDragMode;
+
+    Log.info(
+        '🔧 Toolbar state: isSubMenu=$isSubMenu, showTextStyles=${_toolbarState.showTextStyles}, showInsertMenu=${_toolbarState.showInsertMenu}, showLayoutMenu=${_toolbarState.showLayoutMenu}, isDragMode=${_toolbarState.isDragMode}');
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -144,6 +149,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
 
   List<Widget> _getCurrentMenuButtons() {
     if (_toolbarState.isDragMode) {
+      Log.info('🔧 Toolbar: Showing drag mode buttons');
       return [
         const SizedBox(width: 8.0),
         Text(
@@ -152,16 +158,19 @@ class _JournalToolbarState extends State<JournalToolbar> {
         ),
       ];
     } else if (_toolbarState.showInsertMenu) {
+      Log.info('🔧 Toolbar: Showing insert menu buttons');
       return _buttonFactory
           .getInsertButtons()
           .map(_buildToolbarButton)
           .toList();
     } else if (_toolbarState.showTextStyles) {
+      Log.info('🔧 Toolbar: Showing text style buttons');
       return _buttonFactory
           .getSelectionButtons()
           .map(_buildToolbarButton)
           .toList();
     }
+    Log.info('🔧 Toolbar: Showing main buttons');
     return _buttonFactory.getMainButtons().map(_buildToolbarButton).toList();
   }
 
@@ -169,7 +178,9 @@ class _JournalToolbarState extends State<JournalToolbar> {
     return StatefulBuilder(
       builder: (context, setState) {
         bool isTapped = false;
-
+        bool active = config.isActive?.call() ?? false;
+        Log.info(
+            '🔘 Button ${config.key}: active=$active, enabled=${config.onPressed != null}');
         return GestureDetector(
           onTapDown: (_) {
             setState(() {
@@ -195,11 +206,11 @@ class _JournalToolbarState extends State<JournalToolbar> {
             decoration: BoxDecoration(
               color: isTapped
                   ? Colors.grey.shade200
-                  : config.isActive
+                  : active
                       ? Colors.grey.shade100
                       : null,
               borderRadius: BorderRadius.circular(8.0),
-              border: config.isActive
+              border: active
                   ? Border.all(color: Colors.grey.shade300, width: 1.0)
                   : null,
             ),

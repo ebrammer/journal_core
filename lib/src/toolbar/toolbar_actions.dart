@@ -250,7 +250,9 @@ class ToolbarActions {
     }
   }
 
-  void handleInsertParagraphBelow() {
+  // Insert block below the current block
+
+  void handleInsertBelow() {
     final selection = editorState.selection;
     if (selection == null) return;
     final index = selection.start.path.first;
@@ -273,6 +275,44 @@ class ToolbarActions {
     editorState.apply(transaction);
     editorState.selection = Selection.single(
       path: [index + 1],
+      startOffset: 0,
+    );
+
+    // Restore focus
+    if (hadFocus && focusNode != null) {
+      focusNode!.requestFocus();
+    }
+  }
+
+// Insert block above the current block
+
+  void handleInsertAbove() {
+    final selection = editorState.selection;
+    if (selection == null) return;
+
+    final index = selection.start.path.first;
+
+    // Save focus state
+    final hadFocus = focusNode?.hasFocus ?? false;
+
+    final transaction = editorState.transaction;
+    transaction.insertNode(
+      Path.from([index]),
+      Node(
+        type: 'paragraph',
+        attributes: {
+          'delta': [
+            {'insert': ''}
+          ]
+        },
+      ),
+    );
+
+    editorState.apply(transaction);
+
+    // Move selection to the new node
+    editorState.selection = Selection.single(
+      path: [index],
       startOffset: 0,
     );
 
@@ -472,9 +512,5 @@ class ToolbarActions {
 
   Future<void> handleMoveDown() async {
     // TODO: Implement move down logic (reference epistle_editor.dart's _moveBlockDown)
-  }
-
-  Future<void> handleInsertAbove() async {
-    // TODO: Implement insert above logic
   }
 }
