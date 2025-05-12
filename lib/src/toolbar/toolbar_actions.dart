@@ -97,7 +97,7 @@ class ToolbarActions {
         Selection.collapsed(Position(path: newPath, offset: 0));
 
     // Step 5: Notify UI
-    toolbarState.setBlockType(type, headingLevel: headingLevel);
+    toolbarState.setBlockType(type.name, headingLevel: headingLevel);
 
     Log.info(
         '🔁 Replaced node at path $oldPath with type "${type.name}" at new path $newPath');

@@ -21,10 +21,13 @@ class ToolbarState extends ChangeNotifier {
 
   ToolbarState();
 
-  void setBlockType(BlockType type, {int? headingLevel}) {
-    currentBlockType = type.name;
-    this.headingLevel = headingLevel;
-    notifyListeners();
+  void setBlockType(String type, {int? headingLevel}) {
+    if (currentBlockType != type || this.headingLevel != headingLevel) {
+      Log.info('🔢 Block type changed to: $type, headingLevel: $headingLevel');
+      currentBlockType = type;
+      this.headingLevel = headingLevel;
+      notifyListeners();
+    }
   }
 
   void setTextStyles({
@@ -33,11 +36,16 @@ class ToolbarState extends ChangeNotifier {
     required bool underline,
     required bool strikethrough,
   }) {
-    isStyleBold = bold;
-    isStyleItalic = italic;
-    isStyleUnderline = underline;
-    isStyleStrikethrough = strikethrough;
-    notifyListeners();
+    if (isStyleBold != bold ||
+        isStyleItalic != italic ||
+        isStyleUnderline != underline ||
+        isStyleStrikethrough != strikethrough) {
+      isStyleBold = bold;
+      isStyleItalic = italic;
+      isStyleUnderline = underline;
+      isStyleStrikethrough = strikethrough;
+      notifyListeners();
+    }
   }
 
   void setSelectionInfo({

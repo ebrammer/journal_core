@@ -2,9 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart'; // For AppFlowy integration
-import 'dart:convert'; // For jsonEncode
 import 'package:journal_core/journal_core.dart'; // For EditorWidget
-import '../utils/content_utils.dart'; // Import content_utils.dart for JSON parsing
 import 'package:provider/provider.dart';
 
 class EditorWidget extends StatefulWidget {
@@ -57,14 +55,18 @@ class _EditorWidgetState extends State<EditorWidget> {
     _blockBuilders = standardBlockComponentBuilderMap;
 
     _controller = JournalEditorController(editorState: _editorState);
-    _editorState.selectionNotifier
-        .addListener(_controller.syncToolbarWithSelection);
+    _editorState.selectionNotifier.addListener(() {
+      Log.info('🔄 Selection changed to: ${_editorState.selection}');
+      _controller.syncToolbarWithSelection();
+    });
   }
 
   @override
   void dispose() {
-    _editorState.selectionNotifier
-        .removeListener(_controller.syncToolbarWithSelection);
+    _editorState.selectionNotifier.removeListener(() {
+      Log.info('🔄 Selection changed to: ${_editorState.selection}');
+      _controller.syncToolbarWithSelection();
+    });
     titleController.dispose();
     _focusNode.dispose();
     _controller.dispose();
@@ -74,59 +76,60 @@ class _EditorWidgetState extends State<EditorWidget> {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<ToolbarState>(
-        create: (_) => _controller.toolbarState,
-        child: SizedBox(
-          width: double.infinity,
-          height: double.infinity,
-          child: Column(
-            children: [
-              // Title Editing Block
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(labelText: 'Title'),
-                onChanged: (value) {
-                  setState(() {
-                    _currentTitle = value; // Update title state
-                  });
-                },
-              ),
+      create: (_) => _controller.toolbarState,
+      child: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Column(
+          children: [
+            // Title Editing Block
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(labelText: 'Title'),
+              onChanged: (value) {
+                setState(() {
+                  _currentTitle = value; // Update title state
+                });
+              },
+            ),
 
-              // Editor Content (AppFlowy)
-              Expanded(
-                child: AppFlowyEditor(
-                  editorState: _editorState,
-                  focusNode: _focusNode,
-                  blockComponentBuilders: _blockBuilders,
-                  editorStyle: EditorStyle.mobile(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    cursorColor: Colors.blueAccent,
-                    textStyleConfiguration: const TextStyleConfiguration(
-                      text: TextStyle(
-                        fontSize: 16,
-                        height: 1.5,
-                        color: Colors.black,
-                      ),
-                      bold: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                      italic: TextStyle(
-                        fontStyle: FontStyle.italic,
-                        color: Colors.black,
-                      ),
+            // Editor Content (AppFlowy)
+            Expanded(
+              child: AppFlowyEditor(
+                editorState: _editorState,
+                focusNode: _focusNode,
+                blockComponentBuilders: _blockBuilders,
+                editorStyle: EditorStyle.mobile(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  cursorColor: Colors.blueAccent,
+                  textStyleConfiguration: const TextStyleConfiguration(
+                    text: TextStyle(
+                      fontSize: 16,
+                      height: 1.5,
+                      color: Colors.black,
+                    ),
+                    bold: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                    italic: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Colors.black,
                     ),
                   ),
                 ),
               ),
-              JournalToolbar(
-                editorState: _editorState,
-                controller: _controller,
-                onSave: () async {},
-                focusNode: _focusNode, // Pass the FocusNode
-              ),
-            ],
-          ),
-        ));
+            ),
+            JournalToolbar(
+              editorState: _editorState,
+              controller: _controller,
+              onSave: () async {},
+              focusNode: _focusNode, // Pass the FocusNode
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

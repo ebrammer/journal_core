@@ -1,8 +1,8 @@
 // lib/src/toolbar/toolbar_widget.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-
 import 'package:provider/provider.dart';
 import 'package:journal_core/journal_core.dart';
 
@@ -25,22 +25,22 @@ class JournalToolbar extends StatefulWidget {
 }
 
 class _JournalToolbarState extends State<JournalToolbar> {
-  late ToolbarState _toolbarState;
   late final ToolbarActions _actions;
   late final ToolbarButtons _buttonFactory;
 
   @override
   void initState() {
     super.initState();
-    _toolbarState = ToolbarState();
     _actions = ToolbarActions(
       editorState: widget.editorState,
-      toolbarState: _toolbarState,
+      toolbarState:
+          widget.controller.toolbarState, // Use controller's toolbarState
       focusNode: widget.focusNode, // Pass FocusNode to ToolbarActions
     );
     _buttonFactory = ToolbarButtons(
       editorState: widget.editorState,
-      toolbarState: _toolbarState,
+      toolbarState:
+          widget.controller.toolbarState, // Use controller's toolbarState
       actions: _actions,
       focusNode: widget.focusNode, // Pass FocusNode to ToolbarButtons
     );
@@ -53,20 +53,22 @@ class _JournalToolbarState extends State<JournalToolbar> {
 
   @override
   Widget build(BuildContext context) {
-    _toolbarState = context.watch<ToolbarState>();
+    final toolbarState = context.watch<ToolbarState>();
+    Log.info(
+        '🔧 Toolbar rendering with block type: ${toolbarState.currentBlockType}');
 
-    if (!_toolbarState.isVisible) {
+    if (!toolbarState.isVisible) {
       Log.info('🔧 Toolbar: Not visible');
       return const SizedBox.shrink();
     }
 
-    final isSubMenu = _toolbarState.showTextStyles ||
-        _toolbarState.showInsertMenu ||
-        _toolbarState.showLayoutMenu ||
-        _toolbarState.isDragMode;
+    final isSubMenu = toolbarState.showTextStyles ||
+        toolbarState.showInsertMenu ||
+        toolbarState.showLayoutMenu ||
+        toolbarState.isDragMode;
 
     Log.info(
-        '🔧 Toolbar state: isSubMenu=$isSubMenu, showTextStyles=${_toolbarState.showTextStyles}, showInsertMenu=${_toolbarState.showInsertMenu}, showLayoutMenu=${_toolbarState.showLayoutMenu}, isDragMode=${_toolbarState.isDragMode}');
+        '🔧 Toolbar state: isSubMenu=$isSubMenu, showTextStyles=${toolbarState.showTextStyles}, showInsertMenu=${toolbarState.showInsertMenu}, showLayoutMenu=${toolbarState.showLayoutMenu}, isDragMode=${toolbarState.isDragMode}');
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -91,24 +93,24 @@ class _JournalToolbarState extends State<JournalToolbar> {
                 icon: isSubMenu ? AppIcons.kxCircle : AppIcons.kplusCircle,
                 onPressed: isSubMenu
                     ? () => setState(() {
-                          if (_toolbarState.isDragMode) {
-                            _toolbarState.isDragMode = false;
-                          } else if (_toolbarState.showTextStyles) {
+                          if (toolbarState.isDragMode) {
+                            toolbarState.isDragMode = false;
+                          } else if (toolbarState.showTextStyles) {
                             widget.editorState.selection = Selection.single(
                               path: widget.editorState.selection!.start.path,
                               startOffset:
                                   widget.editorState.selection!.start.offset,
                             );
-                            _toolbarState.showTextStyles = false;
-                          } else if (_toolbarState.showLayoutMenu) {
-                            _toolbarState.showLayoutMenu = false;
-                            _toolbarState.isDragMode = false;
+                            toolbarState.showTextStyles = false;
+                          } else if (toolbarState.showLayoutMenu) {
+                            toolbarState.showLayoutMenu = false;
+                            toolbarState.isDragMode = false;
                           } else {
-                            _toolbarState.showInsertMenu = false;
+                            toolbarState.showInsertMenu = false;
                           }
                         })
                     : () => setState(() {
-                          _toolbarState.showInsertMenu = true;
+                          toolbarState.showInsertMenu = true;
                         }),
               )),
               DividerVertical(),
@@ -132,7 +134,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
             children: [
               const SizedBox(width: 4.0),
               DividerVertical(),
-              if (_toolbarState.isDragMode)
+              if (toolbarState.isDragMode)
                 ..._buttonFactory.getDragButtons().map(_buildToolbarButton)
               else
                 _buildToolbarButton(ToolbarButtonConfig(
@@ -148,7 +150,8 @@ class _JournalToolbarState extends State<JournalToolbar> {
   }
 
   List<Widget> _getCurrentMenuButtons() {
-    if (_toolbarState.isDragMode) {
+    final toolbarState = context.watch<ToolbarState>();
+    if (toolbarState.isDragMode) {
       Log.info('🔧 Toolbar: Showing drag mode buttons');
       return [
         const SizedBox(width: 8.0),
@@ -157,13 +160,13 @@ class _JournalToolbarState extends State<JournalToolbar> {
           style: TextStyle(color: Colors.grey, fontSize: 14),
         ),
       ];
-    } else if (_toolbarState.showInsertMenu) {
+    } else if (toolbarState.showInsertMenu) {
       Log.info('🔧 Toolbar: Showing insert menu buttons');
       return _buttonFactory
           .getInsertButtons()
           .map(_buildToolbarButton)
           .toList();
-    } else if (_toolbarState.showTextStyles) {
+    } else if (toolbarState.showTextStyles) {
       Log.info('🔧 Toolbar: Showing text style buttons');
       return _buttonFactory
           .getSelectionButtons()
@@ -179,8 +182,6 @@ class _JournalToolbarState extends State<JournalToolbar> {
       builder: (context, setState) {
         bool isTapped = false;
         bool active = config.isActive?.call() ?? false;
-        Log.info(
-            '🔘 Button ${config.key}: active=$active, enabled=${config.onPressed != null}');
         return GestureDetector(
           onTapDown: (_) {
             setState(() {

@@ -1,20 +1,21 @@
 // src/editor/journal_editor_controller.dart
 
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:journal_core/src/toolbar/toolbar_state.dart';
+import 'package:journal_core/journal_core.dart';
 
-/// Controller that manages document-level actions and state during editing.
 class JournalEditorController {
   final EditorState editorState;
-  final toolbarState = ToolbarState();
+  final ToolbarState toolbarState;
 
-  JournalEditorController({required this.editorState});
-
-  void dispose() {
-    // Add cleanup if needed in future
+  JournalEditorController({required this.editorState})
+      : toolbarState = ToolbarState() {
+    editorState.selectionNotifier.addListener(syncToolbarWithSelection);
   }
 
-  /// Gets the current document as JSON string
+  void dispose() {
+    editorState.selectionNotifier.removeListener(syncToolbarWithSelection);
+  }
+
   String getDocumentContent() {
     try {
       return editorState.document.toJson().toString();
@@ -23,7 +24,6 @@ class JournalEditorController {
     }
   }
 
-  /// Returns the currently selected block node
   Node? get selectedNode {
     final selection = editorState.selection;
     return selection != null
@@ -32,51 +32,88 @@ class JournalEditorController {
   }
 
   void syncToolbarWithSelection() {
+    Log.info(
+        '🔄 syncToolbarWithSelection triggered with selection: ${editorState.selection}');
     final selection = editorState.selection;
     final node = selection != null
         ? editorState.getNodeAtPath(selection.start.path)
         : null;
 
-    toolbarState
-      ..isVisible = selection != null
-      ..showTextStyles = selection != null && !selection.isCollapsed
-      ..currentBlockType = node?.type ?? 'paragraph'
-      ..headingLevel = node?.attributes['level'] as int?
-      ..currentSelectionPath = selection?.start.path
-      ..previousSiblingType = _getPreviousSiblingType(selection)
-      ..isStyleBold = _isStyleActive('bold')
-      ..isStyleItalic = _isStyleActive('italic')
-      ..isStyleUnderline = _isStyleActive('underline')
-      ..isStyleStrikethrough = _isStyleActive('strikethrough');
-
-    toolbarState.notifyListeners();
-  }
-
-  bool _isStyleActive(String style) {
-    final selection = editorState.selection;
-    if (selection == null || selection.isCollapsed) return false;
-    final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) return false;
-    final delta = node.attributes['delta'] as List?;
-    if (delta == null || delta.isEmpty) return false;
-
-    final startOffset = selection.start.offset;
-    final endOffset = selection.end.offset;
-    var currentOffset = 0;
-
-    for (final op in delta) {
-      final text = op['insert'] as String;
-      final len = text.length;
-      final attrs = op['attributes'] as Map<String, dynamic>?;
-
-      if (currentOffset + len > startOffset && currentOffset < endOffset) {
-        if (attrs?[style] == true) return true;
-      }
-
-      currentOffset += len;
+    if (selection == null || node == null) {
+      toolbarState.setSelectionInfo(
+        isVisible: false,
+        showTextStyles: false,
+        selectionPath: null,
+        previousSiblingType: null,
+      );
+      return;
     }
 
-    return false;
+    // Update block type directly with node.type
+    final blockType = node.type;
+    Log.info(
+        '🔢 Node type at cursor: $blockType, path: ${selection.start.path}');
+    final headingLevel =
+        blockType == 'heading' ? node.attributes['level'] as int? ?? 2 : null;
+    toolbarState.setBlockType(blockType, headingLevel: headingLevel);
+
+    // Update text styles
+    bool isBold = false;
+    bool isItalic = false;
+    bool isUnderline = false;
+    bool isStrikethrough = false;
+
+    final delta = node.attributes['delta'] as List? ?? [];
+    if (delta.isNotEmpty) {
+      if (selection.isCollapsed) {
+        var currentOffset = 0;
+        final cursorOffset = selection.start.offset;
+        for (final op in delta) {
+          final text = op['insert'] as String;
+          final len = text.length;
+          final attrs = op['attributes'] as Map<String, dynamic>? ?? {};
+          if (currentOffset <= cursorOffset &&
+              cursorOffset <= currentOffset + len) {
+            isBold = attrs['bold'] == true;
+            isItalic = attrs['italic'] == true;
+            isUnderline = attrs['underline'] == true;
+            isStrikethrough = attrs['strikethrough'] == true;
+            break;
+          }
+          currentOffset += len;
+        }
+      } else {
+        final startOffset = selection.start.offset;
+        final endOffset = selection.end.offset;
+        var currentOffset = 0;
+        for (final op in delta) {
+          final text = op['insert'] as String;
+          final len = text.length;
+          final attrs = op['attributes'] as Map<String, dynamic>? ?? {};
+          if (currentOffset + len > startOffset && currentOffset < endOffset) {
+            isBold |= attrs['bold'] == true;
+            isItalic |= attrs['italic'] == true;
+            isUnderline |= attrs['underline'] == true;
+            isStrikethrough |= attrs['strikethrough'] == true;
+          }
+          currentOffset += len;
+        }
+      }
+    }
+
+    toolbarState.setTextStyles(
+      bold: isBold,
+      italic: isItalic,
+      underline: isUnderline,
+      strikethrough: isStrikethrough,
+    );
+
+    toolbarState.setSelectionInfo(
+      isVisible: true,
+      showTextStyles: !selection.isCollapsed,
+      selectionPath: selection.start.path,
+      previousSiblingType: _getPreviousSiblingType(selection),
+    );
   }
 
   String? _getPreviousSiblingType(Selection? selection) {

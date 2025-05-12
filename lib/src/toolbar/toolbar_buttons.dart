@@ -32,21 +32,25 @@ class ToolbarButtons {
   });
 
   List<ToolbarButtonConfig> getMainButtons() {
-    final isListBlock = [
-      TodoListBlockKeys.type,
-      BulletedListBlockKeys.type,
-      NumberedListBlockKeys.type
-    ].contains(toolbarState.currentBlockType);
+    // Log current block type for debugging
+    Log.info(
+        '🔧 ToolbarButtons: Current block type: ${toolbarState.currentBlockType}');
 
+    final isListBlock = ['todo_list', 'bulleted_list', 'numbered_list']
+        .contains(toolbarState.currentBlockType);
     final isTopLevel = toolbarState.currentSelectionPath != null &&
         toolbarState.currentSelectionPath!.length == 1;
     final isChildNode = toolbarState.currentSelectionPath != null &&
         toolbarState.currentSelectionPath!.length > 1;
-    final prevIsListBlock = [
-      TodoListBlockKeys.type,
-      BulletedListBlockKeys.type,
-      NumberedListBlockKeys.type
-    ].contains(toolbarState.previousSiblingType);
+    final prevIsListBlock = ['todo_list', 'bulleted_list', 'numbered_list']
+        .contains(toolbarState.previousSiblingType);
+
+    // Directly query EditorState for block type, similar to _getAlignmentIcon
+    final selection = editorState.selection;
+    final currentNodeType = selection != null
+        ? editorState.getNodeAtPath(selection.start.path)?.type ?? 'paragraph'
+        : 'paragraph';
+    Log.info('🔧 ToolbarButtons: EditorState node type: $currentNodeType');
 
     return [
       ToolbarButtonConfig(
@@ -54,16 +58,26 @@ class ToolbarButtons {
         icon: _getHeadingIcon(),
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleCycleHeading(),
-        isActive: () =>
-            toolbarState.currentBlockType == HeadingBlockKeys.type ||
-            toolbarState.currentBlockType == BlockType.paragraph.name,
+        isActive: () {
+          final active =
+              currentNodeType == 'heading' || currentNodeType == 'paragraph';
+          Log.info(
+              '🔘 Heading button isActive: $active for node type: $currentNodeType');
+          return active;
+        },
       ),
       ToolbarButtonConfig(
         key: 'list',
         icon: _getListIcon(),
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleCycleList(),
-        isActive: () => isListBlock,
+        isActive: () {
+          final active = ['bulleted_list', 'numbered_list', 'todo_list']
+              .contains(currentNodeType);
+          Log.info(
+              '🔘 List button isActive: $active for node type: $currentNodeType');
+          return active;
+        },
       ),
       if (isListBlock)
         ToolbarButtonConfig(
@@ -85,7 +99,12 @@ class ToolbarButtons {
         icon: AppIcons.kalignLeftSimple,
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleInsertQuote(),
-        isActive: () => toolbarState.currentBlockType == 'quote',
+        isActive: () {
+          final active = currentNodeType == 'quote';
+          Log.info(
+              '🔘 Quote button isActive: $active for node type: $currentNodeType');
+          return active;
+        },
       ),
       if (!isListBlock)
         ToolbarButtonConfig(
