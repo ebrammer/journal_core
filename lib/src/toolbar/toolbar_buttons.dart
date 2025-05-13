@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 
+/// Configuration for a toolbar button, including icon, action, and active state.
 class ToolbarButtonConfig {
   final IconData icon;
   final VoidCallback? onPressed;
@@ -18,34 +19,58 @@ class ToolbarButtonConfig {
   });
 }
 
+/// Manages the toolbar buttons for the journal editor, including drag and move actions.
+/// - Ensures drag button toggles isDragMode and sets initial selection if none exists.
+/// - Returns move up/down buttons in getDragButtons for drag submenu, inspired by epistle_editor.
+/// - Includes debug logs with 🔍 prefix for button states and actions.
+/// - Compatible with AppFlowy 4.0.0 and single-editor drag-and-drop approach.
 class ToolbarButtons {
   final EditorState editorState;
   final ToolbarState toolbarState;
   final ToolbarActions actions;
-  final FocusNode? focusNode; // Add FocusNode
+  final FocusNode? focusNode;
 
   ToolbarButtons({
     required this.editorState,
     required this.toolbarState,
     required this.actions,
-    this.focusNode, // Add to constructor
+    this.focusNode,
   });
 
   List<ToolbarButtonConfig> getMainButtons() {
-    // Log current block type for debugging
     Log.info(
-        '🔧 ToolbarButtons: Current block type: ${toolbarState.currentBlockType}');
+        '🔧 ToolbarButtons: Current block type: ${toolbarState.currentBlockType}, isDragMode: ${toolbarState.isDragMode}');
 
-    final isListBlock = ['todo_list', 'bulleted_list', 'numbered_list']
-        .contains(toolbarState.currentBlockType);
+    final canIndentNode = [
+      'paragraph',
+      'heading',
+      'todo_list',
+      'bulleted_list',
+      'numbered_list'
+    ].contains(toolbarState.currentBlockType);
+
+    // Get position information
     final isTopLevel = toolbarState.currentSelectionPath != null &&
         toolbarState.currentSelectionPath!.length == 1;
     final isChildNode = toolbarState.currentSelectionPath != null &&
         toolbarState.currentSelectionPath!.length > 1;
-    final prevIsListBlock = ['todo_list', 'bulleted_list', 'numbered_list']
-        .contains(toolbarState.previousSiblingType);
 
-    // Directly query EditorState for block type, similar to _getAlignmentIcon
+    // Check if this is the first item in its parent's children
+    bool isFirstChild = false;
+    if (toolbarState.currentSelectionPath != null) {
+      final currentIndex = toolbarState.currentSelectionPath!.last;
+      isFirstChild = currentIndex == 0;
+    }
+
+    // Determine indent/outdent permissions
+    // Can indent if not the first child at any level
+    final canIndent = !isFirstChild;
+    // Can outdent if it's a child node (not top level) and either not the first child or it's not the top level
+    final canOutdent = isChildNode && (!isFirstChild || !isTopLevel);
+
+    Log.info(
+        '🔧 Position info: isTopLevel: $isTopLevel, isChildNode: $isChildNode, isFirstChild: $isFirstChild, canIndent: $canIndent, canOutdent: $canOutdent');
+
     final selection = editorState.selection;
     final currentNodeType = selection != null
         ? editorState.getNodeAtPath(selection.start.path)?.type ?? 'paragraph'
@@ -67,6 +92,18 @@ class ToolbarButtons {
         },
       ),
       ToolbarButtonConfig(
+        key: 'quote',
+        icon: AppIcons.kalignLeftSimple,
+        onPressed:
+            toolbarState.isDragMode ? null : () => actions.handleInsertQuote(),
+        isActive: () {
+          final active = currentNodeType == 'quote';
+          Log.info(
+              '🔘 Quote button isActive: $active for node type: $currentNodeType');
+          return active;
+        },
+      ),
+      ToolbarButtonConfig(
         key: 'list',
         icon: _getListIcon(),
         onPressed:
@@ -79,34 +116,20 @@ class ToolbarButtons {
           return active;
         },
       ),
-      if (isListBlock)
+      if (canIndentNode)
         ToolbarButtonConfig(
           key: 'outdent',
           icon: AppIcons.ktextOutdent,
-          onPressed: isChildNode ? () => actions.handleOutdent() : null,
-          isActive: () => isChildNode, // Activate if nested
+          onPressed: canOutdent ? () => actions.handleOutdent() : null,
         ),
-      if (isListBlock)
+      if (canIndentNode)
         ToolbarButtonConfig(
           key: 'indent',
           icon: AppIcons.ktextIndent,
-          onPressed: prevIsListBlock ? () => actions.handleIndent() : null,
-          isActive: () =>
-              prevIsListBlock, // Activate if previous sibling is a list
+          onPressed: canIndent ? () => actions.handleIndent() : null,
         ),
-      ToolbarButtonConfig(
-        key: 'quote',
-        icon: AppIcons.kalignLeftSimple,
-        onPressed:
-            toolbarState.isDragMode ? null : () => actions.handleInsertQuote(),
-        isActive: () {
-          final active = currentNodeType == 'quote';
-          Log.info(
-              '🔘 Quote button isActive: $active for node type: $currentNodeType');
-          return active;
-        },
-      ),
-      if (!isListBlock)
+      if (!['todo_list', 'bulleted_list', 'numbered_list', 'quote']
+          .contains(currentNodeType))
         ToolbarButtonConfig(
           key: 'alignment',
           icon: _getAlignmentIcon(),
@@ -114,12 +137,6 @@ class ToolbarButtons {
               ? null
               : () => actions.handleCycleAlignment(),
         ),
-      ToolbarButtonConfig(
-        key: 'drag',
-        icon: AppIcons.kswap,
-        onPressed: () => toolbarState.isDragMode = !toolbarState.isDragMode,
-        isActive: () => toolbarState.isDragMode,
-      ),
       ToolbarButtonConfig(
         key: 'undo',
         icon: AppIcons.karrowArcLeft,

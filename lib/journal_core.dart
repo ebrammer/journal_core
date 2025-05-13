@@ -31,6 +31,7 @@ export 'src/utils/logging.dart';
 
 // Export widgets
 export 'src/widgets/editor_widget.dart';
+export 'src/widgets/reorderable_editor.dart';
 
 // Export extensions
 export 'src/extensions/context_extensions.dart';

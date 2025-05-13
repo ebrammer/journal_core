@@ -6,7 +6,7 @@ import 'package:journal_core/journal_core.dart';
 class ToolbarState extends ChangeNotifier {
   bool isVisible = false;
   bool showTextStyles = false;
-  bool isDragMode = false;
+  bool isDragMode = false; // Added drag mode flag
   bool showInsertMenu = false;
   bool showLayoutMenu = false;
   String currentBlockType = 'paragraph';
@@ -51,11 +51,13 @@ class ToolbarState extends ChangeNotifier {
   void setSelectionInfo({
     required bool isVisible,
     required bool showTextStyles,
+    required bool isDragMode, // Added parameter
     required List<int>? selectionPath,
     required String? previousSiblingType,
   }) {
     this.isVisible = isVisible;
     this.showTextStyles = showTextStyles;
+    this.isDragMode = isDragMode; // Update drag mode
     currentSelectionPath = selectionPath;
     this.previousSiblingType = previousSiblingType;
     notifyListeners();
