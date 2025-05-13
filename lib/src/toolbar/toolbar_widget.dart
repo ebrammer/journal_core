@@ -18,12 +18,14 @@ class JournalToolbar extends StatefulWidget {
     required this.controller,
     this.onSave,
     required this.focusNode,
+    this.onDocumentChanged, // Callback for document changes
   });
 
   final EditorState editorState;
   final JournalEditorController controller;
   final Future Function()? onSave;
   final FocusNode focusNode;
+  final VoidCallback? onDocumentChanged;
 
   @override
   State<JournalToolbar> createState() => _JournalToolbarState();
@@ -40,6 +42,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
       editorState: widget.editorState,
       toolbarState: widget.controller.toolbarState,
       focusNode: widget.focusNode,
+      onDocumentChanged: widget.onDocumentChanged, // Pass to ToolbarActions
     );
     _buttonFactory = ToolbarButtons(
       editorState: widget.editorState,

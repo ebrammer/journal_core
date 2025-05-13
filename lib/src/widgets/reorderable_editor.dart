@@ -13,12 +13,14 @@ class ReorderableEditor extends StatefulWidget {
     required this.selectedBlockPath,
     required this.onBlockSelected,
     this.customBlockRenderers,
+    this.onDocumentChanged, // Callback for document changes
   });
 
   final EditorState editorState;
   final List<int>? selectedBlockPath;
   final void Function(List<int> path) onBlockSelected;
   final Map<String, Widget Function(Node, int depth)>? customBlockRenderers;
+  final VoidCallback? onDocumentChanged;
 
   @override
   State<ReorderableEditor> createState() => _ReorderableEditorState();
@@ -36,15 +38,25 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
   @override
   void didUpdateWidget(covariant ReorderableEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.editorState != oldWidget.editorState) {
-      _flattenedBlocks =
-          _flattenNodes(widget.editorState.document.root.children);
-    }
+    _flattenedBlocks = _flattenNodes(widget.editorState.document.root.children);
+    Log.info('🔁 ReorderableEditor: Rebuilt _flattenedBlocks on widget update');
   }
 
   @override
   void dispose() {
     super.dispose();
+  }
+
+  // Update _flattenedBlocks when document changes (e.g., from move up/down)
+  void _updateBlocks() {
+    if (mounted) {
+      setState(() {
+        _flattenedBlocks =
+            _flattenNodes(widget.editorState.document.root.children);
+      });
+      Log.info(
+          '🔍 ReorderableEditor: Updated _flattenedBlocks on document change');
+    }
   }
 
   List<_BlockEntry> _flattenNodes(List<Node?> nodes) {
@@ -54,10 +66,10 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
     final result = <_BlockEntry>[];
     for (var i = 0; i < nodes.length; i++) {
       final node = nodes[i];
-      if (node == null) {
-        continue;
+      if (node == null || node.type == 'spacer_block') {
+        continue; // Skip spacer_block to make it non-movable
       }
-      final path = [i]; // Top-level path only
+      final path = [i]; // Store actual document path
       result.add(_BlockEntry(node: node, path: path, depth: 0));
       // Children are rendered by parent's builder, not flattened
     }
@@ -77,10 +89,6 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
     final Node nodeToMove = movedEntry.node;
     final List<int> originalPath = movedEntry.path;
 
-    if (originalPath[0] != oldIndex) {
-      return;
-    }
-
     final Transaction transaction = widget.editorState.transaction;
 
     final Node? nodeToDelete = widget.editorState.getNodeAtPath(originalPath);
@@ -89,8 +97,20 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
     }
     transaction.deleteNode(nodeToDelete);
 
-    // Adjust effectiveTargetIndex for document state after deletion
-    final int effectiveTargetIndex = newIndex;
+    // Adjust newIndex to account for spacer blocks in document
+    int spacerCountBefore = 0;
+    for (var i = 0;
+        i <= originalPath[0] &&
+            i < widget.editorState.document.root.children.length;
+        i++) {
+      if (widget.editorState.document.root.children[i]?.type ==
+          'spacer_block') {
+        spacerCountBefore++;
+      }
+    }
+
+    // Calculate effective target index in document (including spacers)
+    final int effectiveTargetIndex = newIndex + spacerCountBefore;
     List<int> finalInsertionPath;
 
     // Get current children length after deletion
@@ -110,6 +130,8 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
         _flattenedBlocks =
             _flattenNodes(widget.editorState.document.root.children);
       });
+      // Notify document change
+      widget.onDocumentChanged?.call();
     } catch (e, s) {
       Log.error(
           '[ReorderableEditor._onReorderCustom] Failed to apply transaction: $e\n$s');
@@ -118,7 +140,7 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
 
     // Set focus to the moved block's final position
     final finalIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-    final adjustedInsertionPath = [finalIndex];
+    final adjustedInsertionPath = currentValidBlocks[finalIndex].path;
     widget.onBlockSelected(adjustedInsertionPath);
   }
 
@@ -135,7 +157,18 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
 
     Widget child;
 
-    if (widget.customBlockRenderers?.containsKey(entry.node.type) ?? false) {
+    // Handle spacer_block explicitly (fallback, should not occur due to filtering)
+    if (entry.node.type == 'spacer_block') {
+      final height =
+          (entry.node.attributes['height'] as num?)?.toDouble() ?? 100.0;
+      child = Container(
+        height: height,
+        margin:
+            const EdgeInsets.symmetric(vertical: 2.0), // Match AppFlowyEditor
+        padding: EdgeInsets.zero, // No extra padding
+      );
+    } else if (widget.customBlockRenderers?.containsKey(entry.node.type) ??
+        false) {
       child = widget.customBlockRenderers![entry.node.type]!(
           entry.node, entry.depth);
     } else {
@@ -171,7 +204,7 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
             textSpans.add(TextSpan(text: text, style: style));
           }
           child = Container(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(95.0),
             color: Colors.red.withValues(alpha: 0.1),
             child: RichText(
               text: TextSpan(
@@ -198,6 +231,17 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
       }
     }
 
+    // Skip GestureDetector for spacer_block to make it non-selectable
+    if (entry.node.type == 'spacer_block') {
+      return IntrinsicHeight(
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 2.0),
+          padding: EdgeInsets.fromLTRB(indent + 6, 8, 6, 4),
+          child: child,
+        ),
+      );
+    }
+
     return GestureDetector(
       key: ValueKey(
           'reorderable_block_${entry.path.join("_")}_${entry.node.id}'),
@@ -206,23 +250,25 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
           widget.onBlockSelected(entry.path);
         }
       },
-      child: IntrinsicHeight(
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 2.0),
-          padding: EdgeInsets.fromLTRB(indent + 6, 4, 6, 4),
-          decoration: BoxDecoration(
+      child: Container(
+        padding: EdgeInsets.fromLTRB(indent + 14, 8, 16, 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Theme.of(context).primaryColorLight.withValues(alpha: 0.15)
+              : Colors.transparent,
+          border: Border.all(
             color: isSelected
-                ? Theme.of(context).primaryColorLight.withValues(alpha: 0.3)
+                ? Theme.of(context).primaryColor
                 : Colors.transparent,
-            border: Border.all(
-              color: isSelected
-                  ? Theme.of(context).primaryColor
-                  : Colors.transparent,
-              width: isSelected ? 1.5 : 0,
-            ),
-            borderRadius: BorderRadius.circular(6),
+            width: isSelected ? 1 : 0,
           ),
-          child: child,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Column(
+          mainAxisAlignment:
+              MainAxisAlignment.start, // Ensure top alignment for list blocks
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [child],
         ),
       ),
     );
@@ -233,7 +279,7 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
       animation: animation,
       builder: (BuildContext context, Widget? child) {
         final double animValue = Curves.easeInOut.transform(animation.value);
-        final double scale = lerpDouble(1, 1.02, animValue)!;
+        final double scale = lerpDouble(1, 1, animValue)!;
         return Material(
           color: Colors.transparent,
           shadowColor: Colors.black.withValues(alpha: 0.3),
@@ -268,7 +314,8 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
     final validFlattenedBlocks = _flattenedBlocks;
     return ReorderableListView.builder(
       key: const PageStorageKey('reorderable_editor_list_view'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(
+          4, 20, 4, 112), // Added 124px horizontal padding
       itemCount: validFlattenedBlocks.length,
       onReorder: (oldIndex, newIndex) {
         _onReorderCustom(oldIndex, newIndex, validFlattenedBlocks);

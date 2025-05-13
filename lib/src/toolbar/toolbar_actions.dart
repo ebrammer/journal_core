@@ -15,12 +15,14 @@ class ToolbarActions {
   final EditorState editorState;
   final ToolbarState toolbarState;
   final FocusNode? focusNode; // For focus restoration
+  final VoidCallback? onDocumentChanged; // Callback for document changes
   Selection? _lastEditorSelection;
 
   ToolbarActions({
     required this.editorState,
     required this.toolbarState,
     this.focusNode,
+    this.onDocumentChanged,
   });
 
   String? getPreviousSiblingType(Selection? selection) {
@@ -598,27 +600,47 @@ class ToolbarActions {
       return;
     }
 
+    // Find the next non-spacer block
+    int nextIndex = currentIndex + 1;
+    while (nextIndex < totalBlocks &&
+        editorState.document.root.children[nextIndex]?.type == 'spacer_block') {
+      nextIndex++;
+    }
+
+    if (nextIndex >= totalBlocks) {
+      Log.info('🔍 Move down blocked: No valid block to move to');
+      return;
+    }
+
+    final nextNode = editorState.document.root.children[nextIndex];
+    if (nextNode == null) {
+      Log.info('🔍 Move down blocked: Next node is null');
+      return;
+    }
+
     final savedSelection = selection;
     final hadFocus = focusNode?.hasFocus ?? false;
 
-    final newIndex = currentIndex + 1;
-    final newPath = [newIndex];
-
     final transaction = editorState.transaction;
-    // Delete the current node
+
+    // First insert the nodes in their new positions
+    transaction.insertNode([currentIndex], nextNode);
+    transaction.insertNode([nextIndex + 1], node);
+
+    // Then delete them from their original positions
     transaction.deleteNode(node);
-    // Insert it at the new position
-    transaction.insertNode(newPath, node);
+    transaction.deleteNode(nextNode);
+
     // Apply the transaction
     editorState.apply(transaction);
-    // Update selection to the new path
+
+    // Update selection to stay with the moved block
     editorState.selection = Selection.single(
-      path: newPath,
+      path: [nextIndex],
       startOffset: savedSelection.start.offset,
     );
 
-    Log.info(
-        '🔍 Moved node down from index $currentIndex to $newIndex, path=$newPath');
+    Log.info('🔍 Swapped blocks at indices $currentIndex and $nextIndex');
     Log.info(
         '🔍 Document state after move down: ${editorState.document.toJson()}');
 
@@ -631,8 +653,11 @@ class ToolbarActions {
       isVisible: true,
       showTextStyles: !savedSelection.isCollapsed,
       isDragMode: toolbarState.isDragMode,
-      selectionPath: newPath,
+      selectionPath: [nextIndex],
       previousSiblingType: getPreviousSiblingType(selection),
     );
+
+    // Notify of document change
+    onDocumentChanged?.call();
   }
 }

@@ -5,6 +5,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
 import 'reorderable_editor.dart'; // New widget for drag mode
+import '../blocks/spacer_block.dart'; // Import spacer block builder
 import 'dart:convert';
 
 class EditorWidget extends StatefulWidget {
@@ -47,10 +48,39 @@ class _EditorWidgetState extends State<EditorWidget> {
     // Initialize the editor state with the raw JSON string
     Log.info('Initializing editor state with content...');
     final document = loadDocumentFromJson(widget.content);
-    Log.info('Created document: ${document.toJson()}');
-
     _editorState = EditorState(document: document);
-    Log.info('Editor state initialized with document');
+
+    // Use a transaction to insert spacer nodes
+    final transaction = _editorState.transaction;
+
+    // Insert top spacer node if not already present at the start
+    if (document.root.children.isEmpty ||
+        document.root.children.first.type != 'spacer_block') {
+      transaction.insertNode(
+          [0],
+          Node(
+            type: 'spacer_block',
+            attributes: {'height': 0}, // 0px top spacer
+          ));
+    }
+    // Append bottom spacer node if not already present at the end
+    if (document.root.children.isEmpty ||
+        document.root.children.last.type != 'spacer_block') {
+      transaction.insertNode(
+          [document.root.children.length],
+          Node(
+            type: 'spacer_block',
+            attributes: {'height': 100}, // Bottom spacer
+          ));
+    }
+
+    try {
+      _editorState.apply(transaction);
+      Log.info('Created document with spacers: ${document.toJson()}');
+    } catch (e, s) {
+      Log.error(
+          '[EditorWidget.initState] Failed to apply spacer transaction: $e\n$s');
+    }
 
     _focusNode = FocusNode();
 
@@ -93,6 +123,13 @@ class _EditorWidgetState extends State<EditorWidget> {
         }
       });
     }
+  }
+
+  // Notify ReorderableEditor of document changes
+  void _onDocumentChanged() {
+    // This will be called by ReorderableEditor and ToolbarActions
+    Log.info('🔍 EditorWidget: Notified of document change');
+    _updateBlocks();
   }
 
   @override
@@ -143,15 +180,20 @@ class _EditorWidgetState extends State<EditorWidget> {
                               editorState: _editorState,
                               selectedBlockPath: _selectedBlockPath,
                               onBlockSelected: _onBlockSelected,
+                              onDocumentChanged:
+                                  _updateBlocks, // Pass to ReorderableEditor
                             ))
                       : AppFlowyEditor(
                           editorState: _editorState,
                           focusNode: _focusNode,
-                          blockComponentBuilders:
-                              standardBlockComponentBuilderMap,
+                          blockComponentBuilders: {
+                            ...standardBlockComponentBuilderMap,
+                            'spacer_block': spacerBlockBuilder,
+                          },
                           editorStyle: EditorStyle.mobile(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
+                                horizontal: 18,
+                                vertical: 8), // Match ReorderableEditor
                             cursorColor: Colors.black,
                             textStyleConfiguration:
                                 const TextStyleConfiguration(
@@ -181,6 +223,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                     Log.info('🔍 Saved document content: $content');
                   },
                   focusNode: _focusNode,
+                  onDocumentChanged: _onDocumentChanged, // Pass to Toolbar
                 ),
               ],
             ),
@@ -188,5 +231,11 @@ class _EditorWidgetState extends State<EditorWidget> {
         },
       ),
     );
+  }
+
+  // Update ReorderableEditor blocks (used as onDocumentChanged callback)
+  void _updateBlocks() {
+    // Will be implemented in ReorderableEditor
+    Log.info('🔍 EditorWidget: Triggered _updateBlocks');
   }
 }
