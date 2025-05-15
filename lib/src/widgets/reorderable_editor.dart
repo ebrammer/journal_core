@@ -5,6 +5,8 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui' show lerpDouble;
+import 'package:journal_core/src/blocks/divider_block.dart' as divider;
+import '../theme/journal_theme.dart';
 
 class ReorderableEditor extends StatefulWidget {
   const ReorderableEditor({
@@ -19,6 +21,7 @@ class ReorderableEditor extends StatefulWidget {
     required this.createdAt,
     required this.onTitleChanged,
     this.focusNode,
+    this.readOnly = true, // Default to read-only in reorder mode
   });
 
   final EditorState editorState;
@@ -31,6 +34,7 @@ class ReorderableEditor extends StatefulWidget {
   final int createdAt;
   final ValueChanged<String> onTitleChanged;
   final FocusNode? focusNode;
+  final bool readOnly;
 
   @override
   State<ReorderableEditor> createState() => ReorderableEditorState();
@@ -206,12 +210,13 @@ class ReorderableEditorState extends State<ReorderableEditor> {
   Widget _buildBlock(_BlockEntry entry) {
     final isSelected = entry.path.join() == widget.selectedBlockPath?.join();
     final indent = entry.depth * 16.0;
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
     // Base style for fallback rendering
-    const baseStyle = TextStyle(
+    final baseStyle = TextStyle(
       fontSize: 16,
       height: 1.5,
-      color: Colors.black,
+      color: theme.primaryText,
     );
 
     Widget child;
@@ -225,6 +230,12 @@ class ReorderableEditorState extends State<ReorderableEditor> {
         margin:
             const EdgeInsets.symmetric(vertical: 2.0), // Match AppFlowyEditor
         padding: EdgeInsets.zero, // No extra padding
+      );
+    } else if (entry.node.type == divider.DividerBlockKeys.type) {
+      // Handle custom divider block
+      child = divider.DividerBlockComponentWidget(
+        node: entry.node,
+        configuration: const BlockComponentConfiguration(),
       );
     } else if (widget.customBlockRenderers?.containsKey(entry.node.type) ??
         false) {
@@ -262,14 +273,10 @@ class ReorderableEditorState extends State<ReorderableEditor> {
             }
             textSpans.add(TextSpan(text: text, style: style));
           }
-          child = Container(
-            padding: const EdgeInsets.all(95.0),
-            color: Colors.red.withValues(alpha: 0.1),
-            child: RichText(
-              text: TextSpan(
-                children: textSpans,
-                style: baseStyle,
-              ),
+          child = RichText(
+            text: TextSpan(
+              children: textSpans,
+              style: baseStyle,
             ),
           );
         }
@@ -303,7 +310,15 @@ class ReorderableEditorState extends State<ReorderableEditor> {
 
     // Wrap the block content in IgnorePointer to prevent editing in reorder mode
     final blockContent = IgnorePointer(
-      child: child,
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          textTheme: Theme.of(context).textTheme.apply(
+                bodyColor: theme.primaryText,
+                displayColor: theme.primaryText,
+              ),
+        ),
+        child: child,
+      ),
     );
 
     return GestureDetector(
@@ -318,12 +333,10 @@ class ReorderableEditorState extends State<ReorderableEditor> {
         padding: EdgeInsets.fromLTRB(indent + 14, 8, 16, 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? Theme.of(context).primaryColorLight.withValues(alpha: 0.15)
+              ? const Color(0xFF2196F3).withOpacity(0.1)
               : Colors.transparent,
           border: Border.all(
-            color: isSelected
-                ? Theme.of(context).primaryColor
-                : Colors.transparent,
+            color: isSelected ? const Color(0xFF2196F3) : Colors.transparent,
             width: isSelected ? 1 : 0,
           ),
           borderRadius: BorderRadius.circular(6),
@@ -373,6 +386,7 @@ class ReorderableEditorState extends State<ReorderableEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     final children = widget.editorState.document.root.children;
     final metadataBlock =
         children.isNotEmpty && children.first.type == 'metadata_block'
@@ -385,6 +399,7 @@ class ReorderableEditorState extends State<ReorderableEditor> {
   }
 
   Widget _buildScrollableList(Node? metadataBlock, List<Node?> nodes) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     return SingleChildScrollView(
       controller: widget.scrollController,
       child: Column(
@@ -399,17 +414,18 @@ class ReorderableEditorState extends State<ReorderableEditor> {
                 titleController: widget.titleController,
                 createdAt: widget.createdAt,
                 onTitleChanged: widget.onTitleChanged,
+                readOnly: widget.readOnly,
               ),
             ),
           // Render reorderable blocks
           if (nodes.isNotEmpty)
             _buildReorderableList(nodes)
           else
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Text(
                 'No blocks to reorder.',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                style: TextStyle(fontSize: 16, color: theme.secondaryText),
               ),
             ),
         ],
@@ -418,6 +434,7 @@ class ReorderableEditorState extends State<ReorderableEditor> {
   }
 
   Widget _buildReorderableList(List<Node?> nodes) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     final validFlattenedBlocks = _flattenNodes(nodes);
     if (validFlattenedBlocks.isEmpty) {
       return const SizedBox.shrink();
@@ -437,9 +454,9 @@ class ReorderableEditorState extends State<ReorderableEditor> {
               '[ReorderableEditor.build] Index $index out of bounds for validFlattenedBlocks length ${validFlattenedBlocks.length}');
           return Container(
             key: ValueKey('block_$index'),
-            child: const Text(
+            child: Text(
               '[Error: Index out of bounds]',
-              style: TextStyle(fontSize: 14, color: Colors.red),
+              style: TextStyle(fontSize: 14, color: theme.error),
             ),
           );
         }

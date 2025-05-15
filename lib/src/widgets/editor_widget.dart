@@ -6,6 +6,8 @@ import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:journal_core/src/utils/focus_helpers.dart';
+import 'package:journal_core/src/blocks/divider_block.dart' as divider;
+import '../theme/journal_theme.dart';
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
@@ -32,6 +34,7 @@ class _EditorWidgetState extends State<EditorWidget> {
   late final FocusNode _focusNode;
   late final JournalEditorController _controller;
   late List<int>? _selectedBlockPath;
+  bool _showDeleteFab = true;
 
   late TextEditingController titleController;
   late FocusNode _titleFocusNode;
@@ -56,6 +59,7 @@ class _EditorWidgetState extends State<EditorWidget> {
     Log.info('Initializing editor state with content...');
     final document = loadDocumentFromJson(widget.content);
     _editorState = EditorState(document: document);
+    EditorGlobals.editorState = _editorState; // Set the global editor state
 
     final transaction = _editorState.transaction;
     // Insert metadata_block at the top instead of spacer_block
@@ -93,11 +97,18 @@ class _EditorWidgetState extends State<EditorWidget> {
       Log.info('🔄 Selection changed to: ${_editorState.selection}');
       _controller.syncToolbarWithSelection();
       _updateSelectedBlockPath();
+      // Reset FAB visibility when selection changes
+      if (mounted) {
+        setState(() {
+          _showDeleteFab = true;
+        });
+      }
     });
 
     _titleFocusNode.addListener(() {
       if (_titleFocusNode.hasFocus) {
-        _focusNode.unfocus();
+        // Don't unfocus the editor's focus node, just clear its selection
+        _editorState.selection = null;
       }
     });
   }
@@ -128,6 +139,7 @@ class _EditorWidgetState extends State<EditorWidget> {
   void _onBlockSelected(List<int> path) {
     setState(() {
       _selectedBlockPath = path;
+      _showDeleteFab = true;
     });
     // Ensure a valid selection exists to keep toolbar visible
     if (_editorState.selection == null) {
@@ -157,16 +169,19 @@ class _EditorWidgetState extends State<EditorWidget> {
     _titleFocusNode.dispose();
     _focusNode.dispose();
     _controller.dispose();
+    EditorGlobals.editorState = null; // Clean up the global editor state
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     return ChangeNotifierProvider<ToolbarState>(
       create: (_) => _controller.toolbarState,
       child: Scaffold(
+        backgroundColor: theme.primaryBackground,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: theme.primaryBackground,
           elevation: 0,
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -192,10 +207,10 @@ class _EditorWidgetState extends State<EditorWidget> {
                       ),
                       child: Text(
                         _currentTitle.isEmpty ? 'Title' : _currentTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16.0,
                           fontWeight: FontWeight.w400,
-                          color: Colors.black,
+                          color: theme.primaryText,
                           letterSpacing: 0.5,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -205,6 +220,47 @@ class _EditorWidgetState extends State<EditorWidget> {
               ),
               Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(AppIcons.ktrash, size: 20),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('Delete Journal'),
+                            content: const Text(
+                                'Are you sure you want to delete this journal? This action cannot be undone.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop(); // Close dialog
+                                  Navigator.of(context)
+                                      .pop(); // Go back to previous page
+                                  widget.onSave(null);
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                    color: Theme.of(context).iconTheme.color,
+                    iconSize: 24.0,
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(width: 12.0),
                   TextButton(
                     onPressed: () async {
                       final content = _controller.getDocumentContent();
@@ -212,8 +268,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                       Log.info('🔍 Saved document content: $content');
                     },
                     style: TextButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
+                      backgroundColor: theme.primaryText,
+                      foregroundColor: theme.primaryBackground,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8.0, vertical: 6.0),
                       minimumSize: const Size(0, 0),
@@ -235,131 +291,196 @@ class _EditorWidgetState extends State<EditorWidget> {
           ),
         ),
         body: Container(
-          color: Colors.white,
-          child: Column(
+          color: theme.primaryBackground,
+          child: Stack(
             children: [
-              Expanded(
-                child: Consumer<ToolbarState>(
-                  builder: (context, toolbarState, _) {
-                    if (toolbarState.isDragMode) {
-                      // Hide the keyboard when entering reorder mode
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        unfocusAndHideKeyboard(context);
-                        // Ensure a valid selection exists to keep toolbar visible
-                        if (_editorState.selection == null &&
-                            _selectedBlockPath != null) {
-                          _editorState.selection = Selection.collapsed(
-                            Position(path: _selectedBlockPath!, offset: 0),
+              Column(
+                children: [
+                  Expanded(
+                    child: Consumer<ToolbarState>(
+                      builder: (context, toolbarState, _) {
+                        if (toolbarState.isDragMode) {
+                          // Hide the keyboard when entering reorder mode
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            unfocusAndHideKeyboard(context);
+                            // Ensure a valid selection exists to keep toolbar visible
+                            if (_editorState.selection == null &&
+                                _selectedBlockPath != null) {
+                              _editorState.selection = Selection.collapsed(
+                                Position(path: _selectedBlockPath!, offset: 0),
+                              );
+                            }
+                          });
+                          Log.info(
+                              '🔍 Switching to ReorderableEditor, nodes: ${_editorState.document.root.children.length}, '
+                              'selection: ${_editorState.selection}, selectedBlockPath: $_selectedBlockPath');
+                          return _editorState.document.root.children.isEmpty
+                              ? const Center(
+                                  child: Text('No blocks to reorder'))
+                              : ReorderableEditor(
+                                  key: _reorderableKey,
+                                  editorState: _editorState,
+                                  selectedBlockPath: _selectedBlockPath,
+                                  onBlockSelected: _onBlockSelected,
+                                  onDocumentChanged: (List<int>? newPath) =>
+                                      _onDocumentChanged(newPath),
+                                  titleController: titleController,
+                                  createdAt: widget.createdAt,
+                                  onTitleChanged: (value) {
+                                    setState(() {
+                                      _currentTitle = value;
+                                    });
+                                  },
+                                  focusNode: _focusNode,
+                                  readOnly: true,
+                                );
+                        } else {
+                          return NotificationListener<ScrollNotification>(
+                            onNotification: (notification) {
+                              if (notification is ScrollUpdateNotification ||
+                                  notification is UserScrollNotification) {
+                                final offset = notification.metrics.pixels;
+                                final shouldShow = offset > 80.0;
+                                if (_showCollapsedTitle != shouldShow) {
+                                  setState(() {
+                                    _showCollapsedTitle = shouldShow;
+                                  });
+                                }
+                              }
+                              return false;
+                            },
+                            child: AppFlowyEditor(
+                              editorState: _editorState,
+                              focusNode: _focusNode,
+                              blockComponentBuilders: {
+                                ...standardBlockComponentBuilderMap,
+                                'spacer_block': spacerBlockBuilder,
+                                'metadata_block': MetadataBlockBuilder(
+                                  titleController: titleController,
+                                  createdAt: widget.createdAt,
+                                  onTitleChanged: (value) {
+                                    setState(() {
+                                      _currentTitle = value;
+                                    });
+                                  },
+                                  titleFocusNode: _titleFocusNode,
+                                  onTitleEditingComplete: _focusFirstRealBlock,
+                                  onTitleSubmitted: (_) =>
+                                      _focusFirstRealBlock(),
+                                  readOnly: false,
+                                ),
+                                divider.DividerBlockKeys.type:
+                                    divider.DividerBlockComponentBuilder(),
+                              },
+                              editorStyle: EditorStyle.mobile(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 8),
+                                cursorColor: theme.primaryText,
+                                textStyleConfiguration: TextStyleConfiguration(
+                                  text: TextStyle(
+                                    fontSize: 16,
+                                    height: 1.5,
+                                    color: theme.primaryText,
+                                  ),
+                                  bold: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.primaryText,
+                                  ),
+                                  italic: TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                    color: theme.primaryText,
+                                  ),
+                                ),
+                              ),
+                            ),
                           );
                         }
-                      });
-                      Log.info(
-                          '🔍 Switching to ReorderableEditor, nodes: ${_editorState.document.root.children.length}, '
-                          'selection: ${_editorState.selection}, selectedBlockPath: $_selectedBlockPath');
-                      return _editorState.document.root.children.isEmpty
-                          ? const Center(child: Text('No blocks to reorder'))
-                          : ReorderableEditor(
-                              key: _reorderableKey,
-                              editorState: _editorState,
-                              selectedBlockPath: _selectedBlockPath,
-                              onBlockSelected: _onBlockSelected,
-                              onDocumentChanged: (List<int>? newPath) =>
-                                  _onDocumentChanged(newPath),
-                              titleController: titleController,
-                              createdAt: widget.createdAt,
-                              onTitleChanged: (value) {
-                                setState(() {
-                                  _currentTitle = value;
-                                });
-                              },
-                              focusNode: _focusNode,
-                            );
-                    } else {
-                      return NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          if (notification is ScrollUpdateNotification ||
-                              notification is UserScrollNotification) {
-                            final offset = notification.metrics.pixels;
-                            final shouldShow = offset > 120.0;
-                            if (_showCollapsedTitle != shouldShow) {
+                      },
+                    ),
+                  ),
+                  JournalToolbar(
+                    editorState: _editorState,
+                    controller: _controller,
+                    onSave: () async {
+                      final content = _controller.getDocumentContent();
+                      await widget.onSave(jsonDecode(content));
+                      Log.info('🔍 Saved document content: $content');
+                    },
+                    focusNode: _focusNode,
+                    onDocumentChanged: () => _onDocumentChanged(),
+                    onMoveUp: () {
+                      if (_selectedBlockPath != null &&
+                          _reorderableKey.currentState != null) {
+                        _reorderableKey.currentState!
+                            .moveBlock(_selectedBlockPath![0], -1);
+                      }
+                    },
+                    onMoveDown: () {
+                      if (_selectedBlockPath != null &&
+                          _reorderableKey.currentState != null) {
+                        _reorderableKey.currentState!
+                            .moveBlock(_selectedBlockPath![0], 1);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              // Floating delete button for selected divider
+              if (_editorState.selection != null && _showDeleteFab)
+                Consumer<ToolbarState>(
+                  builder: (context, toolbarState, _) {
+                    if (toolbarState.isDragMode) {
+                      return const SizedBox.shrink();
+                    }
+                    final selectedNode = _editorState
+                        .getNodeAtPath(_editorState.selection!.start.path);
+                    if (selectedNode?.type == divider.DividerBlockKeys.type) {
+                      return Positioned(
+                        bottom: 56, // Position above the toolbar
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: TextButton(
+                            onPressed: () {
                               setState(() {
-                                _showCollapsedTitle = shouldShow;
+                                _showDeleteFab = false;
                               });
-                            }
-                          }
-                          return false;
-                        },
-                        child: AppFlowyEditor(
-                          editorState: _editorState,
-                          focusNode: _focusNode,
-                          blockComponentBuilders: {
-                            ...standardBlockComponentBuilderMap,
-                            'spacer_block': spacerBlockBuilder,
-                            'metadata_block': MetadataBlockBuilder(
-                              titleController: titleController,
-                              createdAt: widget.createdAt,
-                              onTitleChanged: (value) {
-                                setState(() {
-                                  _currentTitle = value;
-                                });
-                              },
-                              titleFocusNode: _titleFocusNode,
-                              onTitleEditingComplete: _focusFirstRealBlock,
-                              onTitleSubmitted: (_) => _focusFirstRealBlock(),
+                              _deleteDivider(selectedNode!);
+                            },
+                            style: TextButton.styleFrom(
+                              backgroundColor: theme.primaryBackground,
+                              foregroundColor: theme.primaryText,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.0, vertical: 8.0),
+                              minimumSize: const Size(0, 0),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                side: BorderSide(
+                                    color: theme.primaryText, width: 0.5),
+                              ),
                             ),
-                          },
-                          editorStyle: EditorStyle.mobile(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 18, vertical: 8),
-                            cursorColor: Colors.black,
-                            textStyleConfiguration:
-                                const TextStyleConfiguration(
-                              text: TextStyle(
-                                fontSize: 16,
-                                height: 1.5,
-                                color: Colors.black,
-                              ),
-                              bold: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                              italic: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: Colors.black,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(AppIcons.kxCircle, size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Divider',
+                                  style: TextStyle(
+                                    fontSize: 12.0,
+                                    fontWeight: FontWeight.w400,
+                                    color: theme.primaryText,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       );
                     }
+                    return const SizedBox.shrink();
                   },
                 ),
-              ),
-              JournalToolbar(
-                editorState: _editorState,
-                controller: _controller,
-                onSave: () async {
-                  final content = _controller.getDocumentContent();
-                  await widget.onSave(jsonDecode(content));
-                  Log.info('🔍 Saved document content: $content');
-                },
-                focusNode: _focusNode,
-                onDocumentChanged: () => _onDocumentChanged(),
-                onMoveUp: () {
-                  if (_selectedBlockPath != null &&
-                      _reorderableKey.currentState != null) {
-                    _reorderableKey.currentState!
-                        .moveBlock(_selectedBlockPath![0], -1);
-                  }
-                },
-                onMoveDown: () {
-                  if (_selectedBlockPath != null &&
-                      _reorderableKey.currentState != null) {
-                    _reorderableKey.currentState!
-                        .moveBlock(_selectedBlockPath![0], 1);
-                  }
-                },
-              ),
             ],
           ),
         ),
@@ -376,11 +497,28 @@ class _EditorWidgetState extends State<EditorWidget> {
     for (int i = 0; i < children.length; i++) {
       final node = children[i];
       if (node.type != 'metadata_block' && node.type != 'spacer_block') {
+        // Unfocus the title field first
+        _titleFocusNode.unfocus();
+        // Set the selection to the start of the first real block
         _editorState.selection =
             Selection.collapsed(Position(path: [i], offset: 0));
+        // Request focus for the editor
         _focusNode.requestFocus();
         break;
       }
+    }
+  }
+
+  void _deleteDivider(Node node) {
+    final transaction = _editorState.transaction;
+    transaction.deleteNode(node);
+    try {
+      _editorState.apply(transaction);
+      _editorState.selection = null;
+      _onDocumentChanged();
+    } catch (e, s) {
+      Log.error(
+          '[EditorWidget._deleteDivider] Failed to delete divider: $e\n$s');
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:provider/provider.dart';
 import 'package:journal_core/journal_core.dart';
+import '../theme/journal_theme.dart';
 
 /// The toolbar widget for the journal editor, displaying formatting and reordering options.
 /// - Enhances drag submenu to include move up/down buttons alongside "Long press and drag to reorder" message.
@@ -65,6 +66,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     final toolbarState = context.watch<ToolbarState>();
     Log.info(
         '🔧 Toolbar rendering with block type: ${toolbarState.currentBlockType}, isDragMode: ${toolbarState.isDragMode}');
@@ -83,141 +85,156 @@ class _JournalToolbarState extends State<JournalToolbar> {
         '🔧 Toolbar state: isSubMenu=$isSubMenu, showTextStyles=${toolbarState.showTextStyles}, showInsertMenu=${toolbarState.showInsertMenu}, showLayoutMenu=${toolbarState.showLayoutMenu}, isDragMode=${toolbarState.isDragMode}');
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withAlpha(36),
-            blurRadius: 14,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      color: theme.toolbarBackground,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Non-expanded: Plus or Circle X
-          Row(
-            children: [
-              _buildToolbarButton(ToolbarButtonConfig(
-                key: 'menu_toggle',
-                icon: isSubMenu ? AppIcons.kxCircle : AppIcons.kplusCircle,
-                onPressed: isSubMenu
-                    ? () {
-                        setState(() {
-                          if (toolbarState.isDragMode) {
-                            // Preserve selection when exiting drag mode
-                            if (widget.editorState.selection == null) {
-                              final firstNode = widget.editorState.document.root
-                                      .children.isNotEmpty
-                                  ? widget
-                                      .editorState.document.root.children.first
-                                  : null;
-                              if (firstNode != null) {
-                                widget.editorState.selection =
-                                    Selection.collapsed(
-                                        Position(path: firstNode.path));
-                                Log.info(
-                                    '🔍 Restored selection on drag mode exit: ${widget.editorState.selection}');
-                              }
-                            }
-                            toolbarState.isDragMode = false;
-                            Log.info('🔍 Exited drag mode');
-                          } else if (toolbarState.showTextStyles) {
-                            widget.editorState.selection = Selection.single(
-                              path: widget.editorState.selection!.start.path,
-                              startOffset:
-                                  widget.editorState.selection!.start.offset,
-                            );
-                            toolbarState.showTextStyles = false;
-                          } else if (toolbarState.showLayoutMenu) {
-                            toolbarState.showLayoutMenu = false;
-                            toolbarState.isDragMode = false;
-                          } else {
-                            toolbarState.showInsertMenu = false;
-                          }
-                        });
-                        widget.controller.syncToolbarWithSelection();
-                      }
-                    : () {
-                        setState(() {
-                          toolbarState.showInsertMenu = true;
-                        });
-                      },
-              )),
-              DividerVertical(),
-            ],
-          ),
-          // Expanded: Scrollable button row
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(width: 4.0),
-                  ..._getCurrentMenuButtons(),
-                ],
-              ),
-            ),
-          ),
-          // Non-expanded: Keyboard or drag buttons
-          Row(
-            children: [
-              const SizedBox(width: 4.0),
-              DividerVertical(),
-              if (toolbarState.isDragMode)
-                ..._buttonFactory.getDragButtons().map(_buildToolbarButton)
-              else ...[
-                _buildToolbarButton(ToolbarButtonConfig(
-                  key: 'drag',
-                  icon: AppIcons.karrowsDownUp,
-                  onPressed: () {
-                    toolbarState.isDragMode = !toolbarState.isDragMode;
-                    // Ensure a selection exists to keep toolbar visible
-                    if (toolbarState.isDragMode) {
-                      widget.controller.ensureValidSelection();
-                      Log.info(
-                          '🔍 Drag mode entered, selection: ${widget.editorState.selection}');
-                    }
-                    toolbarState.notifyListeners();
-                    Log.info(
-                        '🔍 Drag mode toggled: ${toolbarState.isDragMode}');
-                  },
-                  isActive: () => toolbarState.isDragMode,
-                )),
-                _buildToolbarButton(ToolbarButtonConfig(
-                  key: 'keyboard',
-                  icon: AppIcons.kkeyboard,
-                  onPressed: () {
-                    Log.info('🔧 Keyboard button tapped, unfocusing editor');
-                    // Hide the keyboard
-                    FocusScope.of(context).unfocus();
-                    // Remove focus from the editor
-                    widget.focusNode.unfocus();
-                    // Clear the selection to hide the cursor
-                    widget.editorState.selection = null;
-                    // Hide the toolbar
-                    widget.controller.toolbarState.setSelectionInfo(
-                      isVisible: false,
-                      showTextStyles: false,
-                      isDragMode: false,
-                      selectionPath: null,
-                      previousSiblingType: null,
-                    );
-                    // Execute save
-                    if (widget.onSave != null) {
-                      widget.onSave!();
-                      Log.info('🔍 Triggered onSave from keyboard button');
-                    }
-                    // Log focus state for debugging
-                    Log.info(
-                        '🔧 Editor focus after unfocus: ${widget.focusNode.hasFocus}');
-                  },
-                )),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            decoration: BoxDecoration(
+              color: theme.toolbarBackground,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withAlpha(36),
+                  blurRadius: 14,
+                  offset: const Offset(0, -2),
+                ),
               ],
-            ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Non-expanded: Plus or Circle X
+                Row(
+                  children: [
+                    _buildToolbarButton(ToolbarButtonConfig(
+                      key: 'menu_toggle',
+                      icon:
+                          isSubMenu ? AppIcons.kxCircle : AppIcons.kplusCircle,
+                      onPressed: isSubMenu
+                          ? () {
+                              setState(() {
+                                if (toolbarState.isDragMode) {
+                                  // Preserve selection when exiting drag mode
+                                  if (widget.editorState.selection == null) {
+                                    final firstNode = widget.editorState
+                                            .document.root.children.isNotEmpty
+                                        ? widget.editorState.document.root
+                                            .children.first
+                                        : null;
+                                    if (firstNode != null) {
+                                      widget.editorState.selection =
+                                          Selection.collapsed(
+                                              Position(path: firstNode.path));
+                                      Log.info(
+                                          '🔍 Restored selection on drag mode exit: ${widget.editorState.selection}');
+                                    }
+                                  }
+                                  toolbarState.isDragMode = false;
+                                  Log.info('🔍 Exited drag mode');
+                                } else if (toolbarState.showTextStyles) {
+                                  widget.editorState.selection =
+                                      Selection.single(
+                                    path: widget
+                                        .editorState.selection!.start.path,
+                                    startOffset: widget
+                                        .editorState.selection!.start.offset,
+                                  );
+                                  toolbarState.showTextStyles = false;
+                                } else if (toolbarState.showLayoutMenu) {
+                                  toolbarState.showLayoutMenu = false;
+                                  toolbarState.isDragMode = false;
+                                } else {
+                                  toolbarState.showInsertMenu = false;
+                                }
+                              });
+                              widget.controller.syncToolbarWithSelection();
+                            }
+                          : () {
+                              setState(() {
+                                toolbarState.showInsertMenu = true;
+                              });
+                            },
+                    )),
+                    const DividerVertical(),
+                  ],
+                ),
+                // Expanded: Scrollable button row
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 4.0),
+                        ..._getCurrentMenuButtons(),
+                      ],
+                    ),
+                  ),
+                ),
+                // Non-expanded: Keyboard or drag buttons
+                Row(
+                  children: [
+                    const SizedBox(width: 4.0),
+                    const DividerVertical(),
+                    if (toolbarState.isDragMode)
+                      ..._buttonFactory
+                          .getDragButtons()
+                          .map(_buildToolbarButton)
+                    else ...[
+                      _buildToolbarButton(ToolbarButtonConfig(
+                        key: 'drag',
+                        icon: AppIcons.karrowsDownUp,
+                        onPressed: () {
+                          toolbarState.isDragMode = !toolbarState.isDragMode;
+                          // Ensure a selection exists to keep toolbar visible
+                          if (toolbarState.isDragMode) {
+                            widget.controller.ensureValidSelection();
+                            Log.info(
+                                '🔍 Drag mode entered, selection: ${widget.editorState.selection}');
+                          }
+                          toolbarState.notifyListeners();
+                          Log.info(
+                              '🔍 Drag mode toggled: ${toolbarState.isDragMode}');
+                        },
+                        isActive: () => toolbarState.isDragMode,
+                      )),
+                      _buildToolbarButton(ToolbarButtonConfig(
+                        key: 'keyboard',
+                        icon: AppIcons.kkeyboard,
+                        onPressed: () {
+                          Log.info(
+                              '🔧 Keyboard button tapped, unfocusing editor');
+                          // Hide the keyboard
+                          FocusScope.of(context).unfocus();
+                          // Remove focus from the editor
+                          widget.focusNode.unfocus();
+                          // Clear the selection to hide the cursor
+                          widget.editorState.selection = null;
+                          // Hide the toolbar
+                          widget.controller.toolbarState.setSelectionInfo(
+                            isVisible: false,
+                            showTextStyles: false,
+                            isDragMode: false,
+                            selectionPath: null,
+                            previousSiblingType: null,
+                          );
+                          // Execute save
+                          if (widget.onSave != null) {
+                            widget.onSave!();
+                            Log.info(
+                                '🔍 Triggered onSave from keyboard button');
+                          }
+                          // Log focus state for debugging
+                          Log.info(
+                              '🔧 Editor focus after unfocus: ${widget.focusNode.hasFocus}');
+                        },
+                      )),
+                    ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -225,6 +242,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
   }
 
   List<Widget> _getCurrentMenuButtons() {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     final toolbarState = context.watch<ToolbarState>();
     if (toolbarState.isDragMode) {
       Log.info('🔧 Toolbar: Showing drag mode buttons');
@@ -232,7 +250,10 @@ class _JournalToolbarState extends State<JournalToolbar> {
         const SizedBox(width: 8.0),
         Text(
           'Long press and drag to reorder',
-          style: TextStyle(color: Colors.grey, fontSize: 14),
+          style: TextStyle(
+            color: theme.secondaryText,
+            fontSize: 14,
+          ),
         ),
       ];
     } else if (toolbarState.showInsertMenu) {
@@ -253,6 +274,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
   }
 
   Widget _buildToolbarButton(ToolbarButtonConfig config) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     return StatefulBuilder(
       builder: (context, setState) {
         bool isTapped = false;
@@ -285,21 +307,17 @@ class _JournalToolbarState extends State<JournalToolbar> {
             width: 40.0,
             height: 40.0,
             decoration: BoxDecoration(
-              color: isTapped
-                  ? Colors.grey.shade200
-                  : active
-                      ? Colors.grey.shade100
-                      : null,
+              color: active ? theme.secondaryBackground : null,
               borderRadius: BorderRadius.circular(8.0),
               border: active
-                  ? Border.all(color: Colors.grey.shade300, width: 1.0)
+                  ? Border.all(color: theme.toolbarBorder, width: 1.0)
                   : null,
             ),
             child: Icon(
               config.icon,
               color: config.onPressed == null
-                  ? Colors.grey.shade400
-                  : Colors.black,
+                  ? theme.primaryText.withOpacity(0.5)
+                  : theme.primaryText,
               size: 24.0,
             ),
           ),

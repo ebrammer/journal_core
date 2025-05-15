@@ -3,6 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:intl/intl.dart';
+import 'package:journal_core/journal_core.dart';
+import 'package:provider/provider.dart';
+import '../theme/journal_theme.dart';
 
 /// Metadata block builder to display title and created date
 class MetadataBlockBuilder extends BlockComponentBuilder {
@@ -13,6 +16,7 @@ class MetadataBlockBuilder extends BlockComponentBuilder {
     this.titleFocusNode,
     this.onTitleEditingComplete,
     this.onTitleSubmitted,
+    this.readOnly = false,
   });
 
   final TextEditingController titleController;
@@ -21,6 +25,7 @@ class MetadataBlockBuilder extends BlockComponentBuilder {
   final FocusNode? titleFocusNode;
   final VoidCallback? onTitleEditingComplete;
   final ValueChanged<String>? onTitleSubmitted;
+  final bool readOnly;
 
   @override
   String get blockType => 'metadata_block';
@@ -36,6 +41,7 @@ class MetadataBlockBuilder extends BlockComponentBuilder {
       titleFocusNode: titleFocusNode,
       onTitleEditingComplete: onTitleEditingComplete,
       onTitleSubmitted: onTitleSubmitted,
+      readOnly: readOnly,
     );
   }
 
@@ -55,6 +61,7 @@ class MetadataBlockWidget extends StatelessWidget
     this.titleFocusNode,
     this.onTitleEditingComplete,
     this.onTitleSubmitted,
+    this.readOnly = false,
   });
 
   @override
@@ -65,6 +72,7 @@ class MetadataBlockWidget extends StatelessWidget
   final FocusNode? titleFocusNode;
   final VoidCallback? onTitleEditingComplete;
   final ValueChanged<String>? onTitleSubmitted;
+  final bool readOnly;
 
   @override
   BlockComponentConfiguration get configuration =>
@@ -84,41 +92,81 @@ class MetadataBlockWidget extends StatelessWidget
     final formattedDate = DateFormat('MMMM d, yyyy')
         .format(DateTime.fromMillisecondsSinceEpoch(createdAt));
 
+    // Get the toolbar state to check if we're in reorder mode
+    final toolbarState = context.watch<ToolbarState>();
+    final isReorderMode = toolbarState.isDragMode;
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 8.0),
+      // In reorder mode: Add horizontal padding (16.0) to align with reorderable blocks
+      // In edit mode: No horizontal padding (0.0) to align with content
+      // Vertical padding (8.0) remains consistent in both modes
+      padding: EdgeInsets.symmetric(
+        horizontal: isReorderMode ? 14.0 : 0.0,
+        vertical: isReorderMode ? 0 : 12.0,
+      ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: titleController,
-            focusNode: titleFocusNode,
-            decoration: const InputDecoration(
-              hintText: 'Title',
-              border: InputBorder.none,
-              hintStyle: TextStyle(
-                color: Colors.grey,
+          if (readOnly)
+            Text(
+              titleController.text,
+              style: TextStyle(
                 fontSize: 32.0,
+                fontWeight: FontWeight.w700,
+                color: theme.primaryText,
+                height: 1.5,
               ),
+            )
+          else
+            TextField(
+              controller: titleController,
+              focusNode: titleFocusNode,
+              decoration: InputDecoration(
+                hintText: 'Title',
+                border: InputBorder.none,
+                hintStyle: TextStyle(
+                  color: theme.secondaryText,
+                  fontSize: 32.0,
+                ),
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              style: TextStyle(
+                fontSize: 32.0,
+                fontWeight: FontWeight.w700,
+                color: theme.primaryText,
+                height: 1.5,
+              ),
+              maxLines: null,
+              minLines: 1,
+              textInputAction: TextInputAction.done,
+              onChanged: onTitleChanged,
+              onEditingComplete: onTitleEditingComplete,
+              onSubmitted: onTitleSubmitted,
+              cursorColor: theme.primaryText,
+              cursorWidth: 2.0,
+              cursorRadius: const Radius.circular(1.0),
+              onTap: () {
+                // Clear any selection in the editor when title gets focus
+                final editorState =
+                    Provider.of<EditorState>(context, listen: false);
+                editorState.selection = null;
+              },
             ),
-            style: const TextStyle(
-              fontSize: 32.0,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-              height: 1.5,
-            ),
-            onChanged: onTitleChanged,
-            onEditingComplete: onTitleEditingComplete,
-            onSubmitted: onTitleSubmitted,
-          ),
           const SizedBox(height: 4.0),
           Text(
             '$formattedDate',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14.0,
-              color: Colors.black,
+              color: theme.secondaryText,
               height: 1.5,
             ),
           ),
+          isReorderMode
+              ? const SizedBox(height: 12.0)
+              : const SizedBox.shrink(),
         ],
       ),
     );

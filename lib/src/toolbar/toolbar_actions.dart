@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart'; // For FocusNode
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
+import 'package:journal_core/src/blocks/divider_block.dart' as divider;
 
 /// Manages toolbar actions for the journal editor, including formatting and insertion.
 /// - Includes debug logs with 🔍 prefix for actions.
@@ -235,7 +236,15 @@ class ToolbarActions {
     final hadFocus = focusNode?.hasFocus ?? false;
 
     final transaction = editorState.transaction;
-    transaction.insertNode(Path.from([index + 1]), Node(type: 'divider'));
+    transaction.insertNode(
+      Path.from([index + 1]),
+      Node(
+        type: divider.DividerBlockKeys.type,
+        attributes: {
+          'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      ),
+    );
     editorState.apply(transaction);
     toolbarState.showInsertMenu = false;
 
@@ -502,6 +511,46 @@ class ToolbarActions {
     );
 
     Log.info('🔍 Outdented node from path $currentPath to $newPath');
+
+    if (hadFocus && focusNode != null) {
+      focusNode!.requestFocus();
+    }
+  }
+
+  void handleDelete() {
+    final selection = editorState.selection;
+    if (selection == null) return;
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) return;
+
+    final savedSelection = selection;
+    final hadFocus = focusNode?.hasFocus ?? false;
+
+    final transaction = editorState.transaction;
+    transaction.deleteNode(node);
+    editorState.apply(transaction);
+
+    // Try to select the next node, or the previous node if no next node exists
+    final parentPath =
+        selection.start.path.sublist(0, selection.start.path.length - 1);
+    final currentIndex = selection.start.path.last;
+    final parentNode = editorState.getNodeAtPath(parentPath);
+
+    if (parentNode != null) {
+      if (currentIndex < parentNode.children.length) {
+        // Select next node
+        editorState.selection = Selection.single(
+          path: [...parentPath, currentIndex],
+          startOffset: 0,
+        );
+      } else if (currentIndex > 0) {
+        // Select previous node
+        editorState.selection = Selection.single(
+          path: [...parentPath, currentIndex - 1],
+          startOffset: 0,
+        );
+      }
+    }
 
     if (hadFocus && focusNode != null) {
       focusNode!.requestFocus();

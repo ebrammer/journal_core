@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import '../editor/editor_globals.dart';
+import '../theme/journal_theme.dart';
 
 /// Constants for divider block
 class DividerBlockKeys {
@@ -88,6 +89,7 @@ class _DividerBlockComponentWidgetState
   @override
   Widget build(BuildContext context) {
     final isSelected = _editorState.selection?.start.path == widget.node.path;
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
     return InkWell(
       onTap: () {
@@ -98,7 +100,9 @@ class _DividerBlockComponentWidgetState
       },
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFEFFF) : Colors.transparent,
+          color: isSelected
+              ? const Color(0xFF2196F3).withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Center(
@@ -107,7 +111,7 @@ class _DividerBlockComponentWidgetState
             child: Container(
               width: MediaQuery.of(context).size.width / 3,
               height: 1,
-              color: const Color(0xFFCCCCCC),
+              color: theme.primaryText,
             ),
           ),
         ),

@@ -3,14 +3,14 @@
 ## 🚧 In Progress
 
 - [x] Hide keyboard with button
-- [ ] Reorder button activates but not the submenu until second tap
-- [ ] Reorder by drag or by button not working
+- [x] Reorder button activates but not the submenu until second tap
+- [x] Reorder by drag or by button not working
 - [x] Fix indent logic
 - [ ] Re-enable different divider
 
 ## 🔜 Upcoming
 
-- [ ] Rebuild top bar with done button
+- [x] Rebuild top bar with done button
 - [ ] Set auto save on a timer
 - [ ] Save on hiding keyboard
 - [ ] Reconsider using journalstruct from current
