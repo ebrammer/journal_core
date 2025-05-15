@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
-import 'reorderable_editor.dart'; // New widget for drag mode
-import '../blocks/spacer_block.dart'; // Import spacer block builder
 import 'dart:convert';
+import 'package:journal_core/src/utils/focus_helpers.dart';
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
@@ -14,14 +13,14 @@ class EditorWidget extends StatefulWidget {
     required this.title,
     required this.createdAt,
     required this.lastModified,
-    required this.content, // Raw JSON string
-    required this.onSave, // Callback for saving the updated content
+    required this.content,
+    required this.onSave,
   });
 
   final String title;
-  final int createdAt; // Unix timestamp
-  final int lastModified; // Unix timestamp
-  final String content; // Raw JSON string passed from EditorWrapper
+  final int createdAt;
+  final int lastModified;
+  final String content;
   final Future Function(dynamic updatedJson) onSave;
 
   @override
@@ -32,10 +31,18 @@ class _EditorWidgetState extends State<EditorWidget> {
   late final EditorState _editorState;
   late final FocusNode _focusNode;
   late final JournalEditorController _controller;
-  late List<int>? _selectedBlockPath; // Track selected block for styling
+  late List<int>? _selectedBlockPath;
 
   late TextEditingController titleController;
+  late FocusNode _titleFocusNode;
   String _currentTitle = "";
+  bool _showCollapsedTitle = false;
+
+  final GlobalKey<ReorderableEditorState> _reorderableKey =
+      GlobalKey<ReorderableEditorState>();
+
+  // Add a flag to track if a move is in progress
+  bool _isMovingBlock = false;
 
   @override
   void initState() {
@@ -43,92 +50,100 @@ class _EditorWidgetState extends State<EditorWidget> {
 
     _currentTitle = widget.title;
     titleController = TextEditingController(text: _currentTitle);
+    _titleFocusNode = FocusNode();
     _selectedBlockPath = null;
 
-    // Initialize the editor state with the raw JSON string
     Log.info('Initializing editor state with content...');
     final document = loadDocumentFromJson(widget.content);
     _editorState = EditorState(document: document);
 
-    // Use a transaction to insert spacer nodes
     final transaction = _editorState.transaction;
-
-    // Insert top spacer node if not already present at the start
+    // Insert metadata_block at the top instead of spacer_block
     if (document.root.children.isEmpty ||
-        document.root.children.first.type != 'spacer_block') {
+        document.root.children.first.type != 'metadata_block') {
       transaction.insertNode(
           [0],
           Node(
-            type: 'spacer_block',
-            attributes: {'height': 0}, // 0px top spacer
+            type: 'metadata_block',
+            attributes: {'created_at': widget.createdAt},
           ));
     }
-    // Append bottom spacer node if not already present at the end
+    // Keep bottom spacer_block
     if (document.root.children.isEmpty ||
         document.root.children.last.type != 'spacer_block') {
       transaction.insertNode(
           [document.root.children.length],
           Node(
             type: 'spacer_block',
-            attributes: {'height': 100}, // Bottom spacer
+            attributes: {'height': 100},
           ));
     }
 
     try {
       _editorState.apply(transaction);
-      Log.info('Created document with spacers: ${document.toJson()}');
+      Log.info(
+          'Created document with metadata_block and spacer: ${document.toJson()}');
     } catch (e, s) {
-      Log.error(
-          '[EditorWidget.initState] Failed to apply spacer transaction: $e\n$s');
+      Log.error('[EditorWidget.initState] Failed to apply transaction: $e\n$s');
     }
 
     _focusNode = FocusNode();
-
     _controller = JournalEditorController(editorState: _editorState);
     _editorState.selectionNotifier.addListener(() {
       Log.info('🔄 Selection changed to: ${_editorState.selection}');
       _controller.syncToolbarWithSelection();
       _updateSelectedBlockPath();
     });
+
+    _titleFocusNode.addListener(() {
+      if (_titleFocusNode.hasFocus) {
+        _focusNode.unfocus();
+      }
+    });
   }
 
-  /// Updates the selected block path based on the current editor selection
   void _updateSelectedBlockPath() {
+    if (_isMovingBlock) {
+      // Skip updating during a move to prevent jank
+      return;
+    }
     final selection = _editorState.selection;
-    if (selection != null && mounted) {
-      setState(() {
-        _selectedBlockPath = selection.start.path;
-      });
-      Log.info('🔍 Updated selected block path: $_selectedBlockPath');
-    } else if (mounted) {
-      setState(() {
-        _selectedBlockPath = null;
-      });
-      Log.info('🔍 Cleared selected block path');
-    }
-  }
-
-  /// Handles block selection from ReorderableEditor
-  void _onBlockSelected(List<int> path) {
-    if (mounted && path.join() != _selectedBlockPath?.join()) {
-      setState(() {
-        _selectedBlockPath = path;
-      });
-      // Delay selection update to avoid immediate recursion
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _editorState.selection =
-              Selection.collapsed(Position(path: path, offset: 0));
-          _controller.syncToolbarWithSelection();
+    if (selection != null && selection.start.path.isNotEmpty) {
+      final documentIndex = selection.start.path[0];
+      if (documentIndex > 0) {
+        // Adjust for metadata block
+        final visualIndex = documentIndex - 1;
+        // Only update if significantly different to avoid jank during transactions
+        if (_selectedBlockPath == null ||
+            _selectedBlockPath!.join() != [visualIndex].join()) {
+          setState(() {
+            _selectedBlockPath = [visualIndex];
+          });
+          Log.info('🔍 Updated selectedBlockPath to: $_selectedBlockPath');
         }
-      });
+      }
     }
   }
 
-  // Notify ReorderableEditor of document changes
-  void _onDocumentChanged() {
-    // This will be called by ReorderableEditor and ToolbarActions
+  void _onBlockSelected(List<int> path) {
+    setState(() {
+      _selectedBlockPath = path;
+    });
+    // Ensure a valid selection exists to keep toolbar visible
+    if (_editorState.selection == null) {
+      _editorState.selection = Selection.collapsed(
+        Position(path: path, offset: 0),
+      );
+    }
+  }
+
+  void _onDocumentChanged([List<int>? newSelectedPath]) {
     Log.info('🔍 EditorWidget: Notified of document change');
+    if (newSelectedPath != null) {
+      setState(() {
+        _selectedBlockPath = newSelectedPath;
+      });
+    }
     _updateBlocks();
   }
 
@@ -139,6 +154,7 @@ class _EditorWidgetState extends State<EditorWidget> {
       _controller.syncToolbarWithSelection();
     });
     titleController.dispose();
+    _titleFocusNode.dispose();
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();
@@ -148,52 +164,153 @@ class _EditorWidgetState extends State<EditorWidget> {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<ToolbarState>(
       create: (_) => _controller.toolbarState,
-      child: Consumer<ToolbarState>(
-        builder: (context, toolbarState, _) {
-          // Log state before rendering ReorderableEditor
-          if (toolbarState.isDragMode) {
-            Log.info(
-                '🔍 Switching to ReorderableEditor, nodes: ${_editorState.document.root.children.length}, '
-                'selection: ${_editorState.selection}, selectedBlockPath: $_selectedBlockPath');
-          }
-          return SizedBox(
-            width: double.infinity,
-            height: double.infinity,
-            child: Column(
-              children: [
-                // Title Editing Block
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                  onChanged: (value) {
-                    setState(() {
-                      _currentTitle = value;
-                    });
-                  },
-                ),
-                // Editor Content
-                Expanded(
-                  child: toolbarState.isDragMode
-                      ? (_editorState.document.root.children.isEmpty
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(AppIcons.karrowLeft, size: 24),
+                    onPressed: () => Navigator.of(context).pop(),
+                    color: Theme.of(context).iconTheme.color,
+                    iconSize: 24.0,
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(width: 8.0),
+                  if (_showCollapsedTitle)
+                    Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.6,
+                      ),
+                      child: Text(
+                        _currentTitle.isEmpty ? 'Title' : _currentTitle,
+                        style: const TextStyle(
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.black,
+                          letterSpacing: 0.5,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () async {
+                      final content = _controller.getDocumentContent();
+                      await widget.onSave(jsonDecode(content));
+                      Log.info('🔍 Saved document content: $content');
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0, vertical: 6.0),
+                      minimumSize: const Size(0, 0),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        body: Container(
+          color: Colors.white,
+          child: Column(
+            children: [
+              Expanded(
+                child: Consumer<ToolbarState>(
+                  builder: (context, toolbarState, _) {
+                    if (toolbarState.isDragMode) {
+                      // Hide the keyboard when entering reorder mode
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        unfocusAndHideKeyboard(context);
+                        // Ensure a valid selection exists to keep toolbar visible
+                        if (_editorState.selection == null &&
+                            _selectedBlockPath != null) {
+                          _editorState.selection = Selection.collapsed(
+                            Position(path: _selectedBlockPath!, offset: 0),
+                          );
+                        }
+                      });
+                      Log.info(
+                          '🔍 Switching to ReorderableEditor, nodes: ${_editorState.document.root.children.length}, '
+                          'selection: ${_editorState.selection}, selectedBlockPath: $_selectedBlockPath');
+                      return _editorState.document.root.children.isEmpty
                           ? const Center(child: Text('No blocks to reorder'))
                           : ReorderableEditor(
+                              key: _reorderableKey,
                               editorState: _editorState,
                               selectedBlockPath: _selectedBlockPath,
                               onBlockSelected: _onBlockSelected,
-                              onDocumentChanged:
-                                  _updateBlocks, // Pass to ReorderableEditor
-                            ))
-                      : AppFlowyEditor(
+                              onDocumentChanged: (List<int>? newPath) =>
+                                  _onDocumentChanged(newPath),
+                              titleController: titleController,
+                              createdAt: widget.createdAt,
+                              onTitleChanged: (value) {
+                                setState(() {
+                                  _currentTitle = value;
+                                });
+                              },
+                              focusNode: _focusNode,
+                            );
+                    } else {
+                      return NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification is ScrollUpdateNotification ||
+                              notification is UserScrollNotification) {
+                            final offset = notification.metrics.pixels;
+                            final shouldShow = offset > 120.0;
+                            if (_showCollapsedTitle != shouldShow) {
+                              setState(() {
+                                _showCollapsedTitle = shouldShow;
+                              });
+                            }
+                          }
+                          return false;
+                        },
+                        child: AppFlowyEditor(
                           editorState: _editorState,
                           focusNode: _focusNode,
                           blockComponentBuilders: {
                             ...standardBlockComponentBuilderMap,
                             'spacer_block': spacerBlockBuilder,
+                            'metadata_block': MetadataBlockBuilder(
+                              titleController: titleController,
+                              createdAt: widget.createdAt,
+                              onTitleChanged: (value) {
+                                setState(() {
+                                  _currentTitle = value;
+                                });
+                              },
+                              titleFocusNode: _titleFocusNode,
+                              onTitleEditingComplete: _focusFirstRealBlock,
+                              onTitleSubmitted: (_) => _focusFirstRealBlock(),
+                            ),
                           },
                           editorStyle: EditorStyle.mobile(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 8), // Match ReorderableEditor
+                                horizontal: 18, vertical: 8),
                             cursorColor: Colors.black,
                             textStyleConfiguration:
                                 const TextStyleConfiguration(
@@ -213,29 +330,57 @@ class _EditorWidgetState extends State<EditorWidget> {
                             ),
                           ),
                         ),
-                ),
-                JournalToolbar(
-                  editorState: _editorState,
-                  controller: _controller,
-                  onSave: () async {
-                    final content = _controller.getDocumentContent();
-                    await widget.onSave(jsonDecode(content));
-                    Log.info('🔍 Saved document content: $content');
+                      );
+                    }
                   },
-                  focusNode: _focusNode,
-                  onDocumentChanged: _onDocumentChanged, // Pass to Toolbar
                 ),
-              ],
-            ),
-          );
-        },
+              ),
+              JournalToolbar(
+                editorState: _editorState,
+                controller: _controller,
+                onSave: () async {
+                  final content = _controller.getDocumentContent();
+                  await widget.onSave(jsonDecode(content));
+                  Log.info('🔍 Saved document content: $content');
+                },
+                focusNode: _focusNode,
+                onDocumentChanged: () => _onDocumentChanged(),
+                onMoveUp: () {
+                  if (_selectedBlockPath != null &&
+                      _reorderableKey.currentState != null) {
+                    _reorderableKey.currentState!
+                        .moveBlock(_selectedBlockPath![0], -1);
+                  }
+                },
+                onMoveDown: () {
+                  if (_selectedBlockPath != null &&
+                      _reorderableKey.currentState != null) {
+                    _reorderableKey.currentState!
+                        .moveBlock(_selectedBlockPath![0], 1);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // Update ReorderableEditor blocks (used as onDocumentChanged callback)
   void _updateBlocks() {
-    // Will be implemented in ReorderableEditor
     Log.info('🔍 EditorWidget: Triggered _updateBlocks');
+  }
+
+  void _focusFirstRealBlock() {
+    final children = _editorState.document.root.children;
+    for (int i = 0; i < children.length; i++) {
+      final node = children[i];
+      if (node.type != 'metadata_block' && node.type != 'spacer_block') {
+        _editorState.selection =
+            Selection.collapsed(Position(path: [i], offset: 0));
+        _focusNode.requestFocus();
+        break;
+      }
+    }
   }
 }

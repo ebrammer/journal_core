@@ -17,12 +17,21 @@ class JournalEditorController {
       : toolbarState = ToolbarState();
 
   /// Ensures a valid selection exists in the editor, setting a default if none is present.
-  /// - Sets selection to the first node's path if no selection exists and document is non-empty.
+  /// - Sets selection to the first non-metadata node's path if no selection exists and document is non-empty.
   void ensureValidSelection() {
     if (editorState.selection == null &&
         editorState.document.root.children.isNotEmpty) {
-      editorState.selection = Selection.collapsed(
-          Position(path: editorState.document.root.children.first.path));
+      // Skip metadata_block for selection
+      final firstNonMetadataNode = editorState.document.root.children
+          .asMap()
+          .entries
+          .firstWhere(
+            (entry) => entry.value.type != 'metadata_block',
+            orElse: () => MapEntry(0, editorState.document.root.children.first),
+          )
+          .value;
+      editorState.selection =
+          Selection.collapsed(Position(path: firstNonMetadataNode.path));
       Log.info('🔍 Set default selection: ${editorState.selection}');
     }
   }
@@ -47,7 +56,7 @@ class JournalEditorController {
 
       if (selection != null) {
         final node = editorState.getNodeAtPath(selection.start.path);
-        if (node != null) {
+        if (node != null && node.type != 'metadata_block') {
           currentBlockType = node.type;
           if (currentBlockType == 'heading') {
             headingLevel = node.attributes[HeadingBlockKeys.level] as int? ?? 2;
@@ -121,13 +130,24 @@ class JournalEditorController {
     }
   }
 
-  /// Retrieves the current document content as a JSON string.
+  /// Retrieves the current document content as a JSON string, excluding metadata_block.
   /// - Serializes the editor's document for saving or external use.
   String getDocumentContent() {
     try {
       final json = editorState.document.toJson();
-      final content = jsonEncode(json);
-      Log.info('🔍 Retrieved document content: $content');
+      final documentMap = json['document'] as Map<String, dynamic>? ?? {};
+      final children = documentMap['children'] as List<dynamic>? ?? [];
+      final filteredChildren =
+          children.where((node) => node['type'] != 'metadata_block').toList();
+      final filteredJson = {
+        'document': {
+          'type': documentMap['type'] as String? ?? 'page',
+          'children': filteredChildren,
+        }
+      };
+      final content = jsonEncode(filteredJson);
+      Log.info(
+          '🔍 Retrieved document content (excluded metadata_block): $content');
       return content;
     } catch (e, stackTrace) {
       Log.error('🔍 Failed to get document content: $e');

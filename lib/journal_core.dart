@@ -10,9 +10,9 @@ export 'src/blocks/prayer_block.dart';
 export 'src/blocks/scripture_block.dart';
 export 'src/blocks/tag_picker_block.dart';
 export 'src/blocks/divider_block.dart';
-export 'src/blocks/title_block.dart';
 export 'src/blocks/date_block.dart';
-
+export 'src/blocks/spacer_block.dart';
+export 'src/blocks/metadata_block.dart';
 // Export models
 export 'src/models/block_model.dart';
 export 'src/models/styled_span.dart';

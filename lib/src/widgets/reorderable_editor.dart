@@ -13,26 +13,40 @@ class ReorderableEditor extends StatefulWidget {
     required this.selectedBlockPath,
     required this.onBlockSelected,
     this.customBlockRenderers,
-    this.onDocumentChanged, // Callback for document changes
+    this.onDocumentChanged,
+    this.scrollController,
+    required this.titleController,
+    required this.createdAt,
+    required this.onTitleChanged,
+    this.focusNode,
   });
 
   final EditorState editorState;
   final List<int>? selectedBlockPath;
   final void Function(List<int> path) onBlockSelected;
   final Map<String, Widget Function(Node, int depth)>? customBlockRenderers;
-  final VoidCallback? onDocumentChanged;
+  final void Function(List<int>?)? onDocumentChanged;
+  final ScrollController? scrollController;
+  final TextEditingController titleController;
+  final int createdAt;
+  final ValueChanged<String> onTitleChanged;
+  final FocusNode? focusNode;
 
   @override
-  State<ReorderableEditor> createState() => _ReorderableEditorState();
+  State<ReorderableEditor> createState() => ReorderableEditorState();
 }
 
-class _ReorderableEditorState extends State<ReorderableEditor> {
+class ReorderableEditorState extends State<ReorderableEditor> {
   late List<_BlockEntry> _flattenedBlocks; // Top-level blocks only
+  late EditorState _editorState;
+  late ScrollController _controller;
 
   @override
   void initState() {
     super.initState();
     _flattenedBlocks = _flattenNodes(widget.editorState.document.root.children);
+    _editorState = widget.editorState;
+    _controller = widget.scrollController ?? ScrollController();
   }
 
   @override
@@ -47,101 +61,146 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
     super.dispose();
   }
 
-  // Update _flattenedBlocks when document changes (e.g., from move up/down)
-  void _updateBlocks() {
-    if (mounted) {
-      setState(() {
-        _flattenedBlocks =
-            _flattenNodes(widget.editorState.document.root.children);
-      });
-      Log.info(
-          '🔍 ReorderableEditor: Updated _flattenedBlocks on document change');
-    }
-  }
-
   List<_BlockEntry> _flattenNodes(List<Node?> nodes) {
     if (nodes.isEmpty) {
       return [];
     }
     final result = <_BlockEntry>[];
+    int visualIndex = 0;
     for (var i = 0; i < nodes.length; i++) {
       final node = nodes[i];
-      if (node == null || node.type == 'spacer_block') {
-        continue; // Skip spacer_block to make it non-movable
+      if (node == null ||
+          node.type == 'spacer_block' ||
+          node.type == 'metadata_block') {
+        continue; // Skip spacer_block and metadata_block
       }
-      final path = [i]; // Store actual document path
-      result.add(_BlockEntry(node: node, path: path, depth: 0));
-      // Children are rendered by parent's builder, not flattened
+      final path = [visualIndex]; // Visual index for reordering
+      result
+          .add(_BlockEntry(node: node, path: path, depth: 0, documentIndex: i));
+      visualIndex++;
     }
     return result;
   }
 
   void _onReorderCustom(
-      int oldIndex, int newIndex, List<_BlockEntry> currentValidBlocks) {
+      int oldIndex, int newIndex, List<_BlockEntry> currentValidBlocks,
+      {bool isDrag = false}) {
     if (oldIndex < 0 ||
         oldIndex >= currentValidBlocks.length ||
         newIndex < 0 ||
-        newIndex > currentValidBlocks.length) {
+        newIndex >= currentValidBlocks.length) {
+      Log.error(
+          'Invalid reorder indices: oldIndex=$oldIndex, newIndex=$newIndex');
       return;
     }
 
     final _BlockEntry movedEntry = currentValidBlocks[oldIndex];
     final Node nodeToMove = movedEntry.node;
-    final List<int> originalPath = movedEntry.path;
 
+    // Find the current document index of the node to move
+    int? documentOldIndex;
+    for (int i = 0; i < widget.editorState.document.root.children.length; i++) {
+      final node = widget.editorState.document.root.children[i];
+      if (node?.id == nodeToMove.id) {
+        documentOldIndex = i;
+        break;
+      }
+    }
+
+    if (documentOldIndex == null) {
+      Log.error('Node to move not found in document, id: ${nodeToMove.id}');
+      return;
+    }
+
+    // For drag-down, adjust newIndex; for arrows, use newIndex directly
+    final targetVisualIndex =
+        isDrag && newIndex > oldIndex ? newIndex - 1 : newIndex;
+    final newVisualPath = [targetVisualIndex];
+
+    Log.info('🔍 _onReorderCustom: oldIndex=$oldIndex, newIndex=$newIndex, '
+        'targetVisualIndex=$targetVisualIndex');
+
+    // Calculate document insertion index
+    int documentNewIndex = 1; // Start after metadata block
+    int currentVisualIndex = 0;
+    final documentChildren = widget.editorState.document.root.children;
+    for (var i = 0;
+        i < documentChildren.length && currentVisualIndex <= targetVisualIndex;
+        i++) {
+      final node = documentChildren[i];
+      if (node == null ||
+          node.type == 'spacer_block' ||
+          node.type == 'metadata_block' ||
+          node.id == nodeToMove.id) {
+        continue; // Skip metadata, spacer, or the node being moved
+      }
+      if (currentVisualIndex == targetVisualIndex) {
+        documentNewIndex = i; // Insert at this document index
+        break;
+      }
+      currentVisualIndex++;
+      documentNewIndex++;
+    }
+
+    // If targetVisualIndex is at the end, append after the last valid block
+    if (currentVisualIndex < targetVisualIndex) {
+      documentNewIndex = documentChildren.length;
+      for (var i = documentChildren.length - 1; i >= 0; i--) {
+        final node = documentChildren[i];
+        if (node != null &&
+            node.type != 'spacer_block' &&
+            node.type != 'metadata_block' &&
+            node.id != nodeToMove.id) {
+          documentNewIndex = i + 1;
+          break;
+        }
+      }
+    }
+
+    // Ensure documentNewIndex is valid
+    final currentChildrenLength = documentChildren.length;
+    final finalInsertionPath = [
+      documentNewIndex.clamp(1, currentChildrenLength)
+    ];
+
+    Log.info('🔍 _onReorderCustom: documentOldIndex=$documentOldIndex, '
+        'documentNewIndex=$documentNewIndex, finalInsertionPath=$finalInsertionPath');
+
+    // Perform the transaction
     final Transaction transaction = widget.editorState.transaction;
 
-    final Node? nodeToDelete = widget.editorState.getNodeAtPath(originalPath);
+    // Delete the node at its current document index
+    final Node? nodeToDelete =
+        widget.editorState.getNodeAtPath([documentOldIndex]);
     if (nodeToDelete == null || nodeToDelete.id != nodeToMove.id) {
+      Log.error(
+          'Node to delete not found at path [$documentOldIndex], id: ${nodeToMove.id}');
       return;
     }
     transaction.deleteNode(nodeToDelete);
 
-    // Adjust newIndex to account for spacer blocks in document
-    int spacerCountBefore = 0;
-    for (var i = 0;
-        i <= originalPath[0] &&
-            i < widget.editorState.document.root.children.length;
-        i++) {
-      if (widget.editorState.document.root.children[i]?.type ==
-          'spacer_block') {
-        spacerCountBefore++;
-      }
-    }
-
-    // Calculate effective target index in document (including spacers)
-    final int effectiveTargetIndex = newIndex + spacerCountBefore;
-    List<int> finalInsertionPath;
-
-    // Get current children length after deletion
-    final currentChildrenLength =
-        widget.editorState.document.root.children.length;
-    if (effectiveTargetIndex > currentChildrenLength) {
-      finalInsertionPath = [currentChildrenLength];
-    } else {
-      finalInsertionPath = [effectiveTargetIndex];
-    }
-
+    // Insert the node at the new document index
     transaction.insertNode(finalInsertionPath, nodeToMove);
 
     try {
       widget.editorState.apply(transaction);
+      // Set selection to the new block immediately after transaction
+      widget.editorState.selection = Selection.collapsed(
+          Position(path: [targetVisualIndex + 1], offset: 0));
       setState(() {
         _flattenedBlocks =
             _flattenNodes(widget.editorState.document.root.children);
       });
-      // Notify document change
-      widget.onDocumentChanged?.call();
+      // Notify document change with the new visual path
+      widget.onDocumentChanged?.call(newVisualPath);
+      widget.focusNode?.requestFocus();
+      Log.info(
+          '🔍 Reordered block to visual path: $newVisualPath, document path: [${targetVisualIndex + 1}], focus requested');
     } catch (e, s) {
       Log.error(
           '[ReorderableEditor._onReorderCustom] Failed to apply transaction: $e\n$s');
       return;
     }
-
-    // Set focus to the moved block's final position
-    final finalIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-    final adjustedInsertionPath = currentValidBlocks[finalIndex].path;
-    widget.onBlockSelected(adjustedInsertionPath);
   }
 
   Widget _buildBlock(_BlockEntry entry) {
@@ -242,12 +301,17 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
       );
     }
 
+    // Wrap the block content in IgnorePointer to prevent editing in reorder mode
+    final blockContent = IgnorePointer(
+      child: child,
+    );
+
     return GestureDetector(
       key: ValueKey(
           'reorderable_block_${entry.path.join("_")}_${entry.node.id}'),
       onTap: () {
         if (entry.path.join() != widget.selectedBlockPath?.join()) {
-          widget.onBlockSelected(entry.path);
+          _onBlockSelected(entry.path);
         }
       },
       child: Container(
@@ -264,11 +328,21 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
           ),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.start, // Ensure top alignment for list blocks
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [child],
+        child: Theme(
+          // Override cursor color to be transparent in reorder mode
+          data: Theme.of(context).copyWith(
+            textSelectionTheme: TextSelectionThemeData(
+              cursorColor: Colors.transparent,
+              selectionColor: Colors.transparent,
+              selectionHandleColor: Colors.transparent,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment:
+                MainAxisAlignment.start, // Ensure top alignment for list blocks
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [blockContent],
+          ),
         ),
       ),
     );
@@ -299,26 +373,62 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
 
   @override
   Widget build(BuildContext context) {
-    if (_flattenedBlocks.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text(
-            'No blocks to reorder.',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-        ),
-      );
-    }
+    final children = widget.editorState.document.root.children;
+    final metadataBlock =
+        children.isNotEmpty && children.first.type == 'metadata_block'
+            ? children.first
+            : null;
+    final blocksToReorder =
+        metadataBlock != null ? children.sublist(1) : children;
 
-    final validFlattenedBlocks = _flattenedBlocks;
+    return _buildScrollableList(metadataBlock, blocksToReorder);
+  }
+
+  Widget _buildScrollableList(Node? metadataBlock, List<Node?> nodes) {
+    return SingleChildScrollView(
+      controller: widget.scrollController,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Render metadata block at the top, non-reorderable
+          if (metadataBlock != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 20, 4, 0),
+              child: MetadataBlockWidget(
+                node: metadataBlock,
+                titleController: widget.titleController,
+                createdAt: widget.createdAt,
+                onTitleChanged: widget.onTitleChanged,
+              ),
+            ),
+          // Render reorderable blocks
+          if (nodes.isNotEmpty)
+            _buildReorderableList(nodes)
+          else
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'No blocks to reorder.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReorderableList(List<Node?> nodes) {
+    final validFlattenedBlocks = _flattenNodes(nodes);
+    if (validFlattenedBlocks.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return ReorderableListView.builder(
       key: const PageStorageKey('reorderable_editor_list_view'),
-      padding: const EdgeInsets.fromLTRB(
-          4, 20, 4, 112), // Added 124px horizontal padding
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 112),
       itemCount: validFlattenedBlocks.length,
       onReorder: (oldIndex, newIndex) {
-        _onReorderCustom(oldIndex, newIndex, validFlattenedBlocks);
+        _onReorderCustom(oldIndex, newIndex, validFlattenedBlocks,
+            isDrag: true);
       },
       proxyDecorator: _proxyDecorator,
       itemBuilder: (context, index) {
@@ -335,7 +445,58 @@ class _ReorderableEditorState extends State<ReorderableEditor> {
         }
         return _buildBlock(validFlattenedBlocks[index]);
       },
+      shrinkWrap: true, // Ensure it fits within the SingleChildScrollView
+      physics: const NeverScrollableScrollPhysics(), // Disable inner scrolling
     );
+  }
+
+  // Public method to move a block up or down by direction (-1 for up, +1 for down)
+  void moveBlock(int currentIndex, int direction) {
+    // Use the same filtered list as the UI: skip metadata and spacer blocks
+    final children = widget.editorState.document.root.children;
+    final metadataBlock =
+        children.isNotEmpty && children.first.type == 'metadata_block'
+            ? children.first
+            : null;
+    final blocksToReorder =
+        metadataBlock != null ? children.sublist(1) : children;
+    final validBlocks = _flattenNodes(blocksToReorder);
+    if (validBlocks.isEmpty) {
+      Log.info('🔍 No blocks to reorder');
+      return;
+    }
+
+    int newIndex;
+    if (direction == -1) {
+      // Move up, prevent moving before first block
+      newIndex = currentIndex == 0 ? 0 : currentIndex - 1;
+    } else {
+      // Move down, allow moving to the end
+      newIndex = currentIndex + 1;
+    }
+
+    if (currentIndex == newIndex || newIndex >= validBlocks.length) {
+      Log.info(
+          '🔍 Move blocked: Already at boundary (index: $currentIndex, newIndex: $newIndex)');
+      return;
+    }
+
+    Log.info('🔍 Moving block from visual index $currentIndex to $newIndex');
+    _onReorderCustom(currentIndex, newIndex, validBlocks, isDrag: false);
+  }
+
+  void _onBlockSelected(List<int> path) {
+    if (mounted && path.join() != widget.selectedBlockPath?.join()) {
+      // Update the editor selection to match the tapped block
+      final documentPath = [path[0] + 1]; // Adjust for metadata block
+      widget.editorState.selection = Selection.collapsed(
+        Position(path: documentPath, offset: 0),
+      );
+      // Notify parent of selection change
+      widget.onBlockSelected(path);
+      // Request focus to ensure cursor is visible
+      widget.focusNode?.requestFocus();
+    }
   }
 }
 
@@ -344,9 +505,11 @@ class _BlockEntry {
     required this.node,
     required this.path,
     required this.depth,
+    required this.documentIndex,
   });
 
   final Node node;
   final List<int> path;
   final int depth;
+  final int documentIndex;
 }

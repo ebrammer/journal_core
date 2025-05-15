@@ -19,6 +19,8 @@ class JournalToolbar extends StatefulWidget {
     this.onSave,
     required this.focusNode,
     this.onDocumentChanged, // Callback for document changes
+    this.onMoveUp,
+    this.onMoveDown,
   });
 
   final EditorState editorState;
@@ -26,6 +28,8 @@ class JournalToolbar extends StatefulWidget {
   final Future Function()? onSave;
   final FocusNode focusNode;
   final VoidCallback? onDocumentChanged;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   State<JournalToolbar> createState() => _JournalToolbarState();
@@ -49,6 +53,8 @@ class _JournalToolbarState extends State<JournalToolbar> {
       toolbarState: widget.controller.toolbarState,
       actions: _actions,
       focusNode: widget.focusNode,
+      onMoveUp: widget.onMoveUp,
+      onMoveDown: widget.onMoveDown,
     );
   }
 
@@ -166,7 +172,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
               else ...[
                 _buildToolbarButton(ToolbarButtonConfig(
                   key: 'drag',
-                  icon: AppIcons.kswap,
+                  icon: AppIcons.karrowsDownUp,
                   onPressed: () {
                     toolbarState.isDragMode = !toolbarState.isDragMode;
                     // Ensure a selection exists to keep toolbar visible

@@ -4,19 +4,14 @@ import 'package:flutter/material.dart'; // For FocusNode
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 
-/// Manages toolbar actions for the journal editor, including block reordering,
-/// formatting, and insertion.
-/// - Simplified handleMoveUp and handleMoveDown to reliably move top-level blocks.
-/// - Ensures selection follows the moved block, fixing cursor movement issues.
-/// - Adds bounds checking to prevent invalid moves (e.g., moving first block up).
-/// - Includes debug logs with 🔍 prefix for reordering and other actions.
+/// Manages toolbar actions for the journal editor, including formatting and insertion.
+/// - Includes debug logs with 🔍 prefix for actions.
 /// - Compatible with AppFlowy 4.0.0 and single-editor drag-and-drop approach.
 class ToolbarActions {
   final EditorState editorState;
   final ToolbarState toolbarState;
   final FocusNode? focusNode; // For focus restoration
   final VoidCallback? onDocumentChanged; // Callback for document changes
-  Selection? _lastEditorSelection;
 
   ToolbarActions({
     required this.editorState,
@@ -511,153 +506,5 @@ class ToolbarActions {
     if (hadFocus && focusNode != null) {
       focusNode!.requestFocus();
     }
-  }
-
-  void handleMoveUp() {
-    final selection = editorState.selection;
-    if (selection == null) {
-      Log.info('🔍 Move up blocked: No selection');
-      return;
-    }
-    final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) {
-      Log.info('🔍 Move up blocked: No node at path ${selection.start.path}');
-      return;
-    }
-    final currentPath = selection.start.path;
-    if (currentPath.length != 1) {
-      Log.info(
-          '🔍 Move up blocked: Only top-level blocks supported, path=$currentPath');
-      return;
-    }
-    final currentIndex = currentPath.last;
-    if (currentIndex == 0) {
-      Log.info(
-          '🔍 Move up blocked: Node at index $currentIndex is already at the top');
-      return;
-    }
-
-    final savedSelection = selection;
-    final hadFocus = focusNode?.hasFocus ?? false;
-
-    final newIndex = currentIndex - 1;
-    final newPath = [newIndex];
-
-    final transaction = editorState.transaction;
-    // Delete the current node
-    transaction.deleteNode(node);
-    // Insert it at the new position
-    transaction.insertNode(newPath, node);
-    // Apply the transaction
-    editorState.apply(transaction);
-    // Update selection to the new path
-    editorState.selection = Selection.single(
-      path: newPath,
-      startOffset: savedSelection.start.offset,
-    );
-
-    Log.info(
-        '🔍 Moved node up from index $currentIndex to $newIndex, path=$newPath');
-    Log.info(
-        '🔍 Document state after move up: ${editorState.document.toJson()}');
-
-    if (hadFocus && focusNode != null) {
-      focusNode!.requestFocus();
-    }
-
-    // Notify toolbar to update block type and selection
-    toolbarState.setSelectionInfo(
-      isVisible: true,
-      showTextStyles: !savedSelection.isCollapsed,
-      isDragMode: toolbarState.isDragMode,
-      selectionPath: newPath,
-      previousSiblingType: getPreviousSiblingType(selection),
-    );
-  }
-
-  void handleMoveDown() {
-    final selection = editorState.selection;
-    if (selection == null) {
-      Log.info('🔍 Move down blocked: No selection');
-      return;
-    }
-    final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) {
-      Log.info('🔍 Move down blocked: No node at path ${selection.start.path}');
-      return;
-    }
-    final currentPath = selection.start.path;
-    if (currentPath.length != 1) {
-      Log.info(
-          '🔍 Move down blocked: Only top-level blocks supported, path=$currentPath');
-      return;
-    }
-    final currentIndex = currentPath.last;
-    final totalBlocks = editorState.document.root.children.length;
-    if (currentIndex >= totalBlocks - 1) {
-      Log.info(
-          '🔍 Move down blocked: Node at index $currentIndex is already at the bottom');
-      return;
-    }
-
-    // Find the next non-spacer block
-    int nextIndex = currentIndex + 1;
-    while (nextIndex < totalBlocks &&
-        editorState.document.root.children[nextIndex]?.type == 'spacer_block') {
-      nextIndex++;
-    }
-
-    if (nextIndex >= totalBlocks) {
-      Log.info('🔍 Move down blocked: No valid block to move to');
-      return;
-    }
-
-    final nextNode = editorState.document.root.children[nextIndex];
-    if (nextNode == null) {
-      Log.info('🔍 Move down blocked: Next node is null');
-      return;
-    }
-
-    final savedSelection = selection;
-    final hadFocus = focusNode?.hasFocus ?? false;
-
-    final transaction = editorState.transaction;
-
-    // First insert the nodes in their new positions
-    transaction.insertNode([currentIndex], nextNode);
-    transaction.insertNode([nextIndex + 1], node);
-
-    // Then delete them from their original positions
-    transaction.deleteNode(node);
-    transaction.deleteNode(nextNode);
-
-    // Apply the transaction
-    editorState.apply(transaction);
-
-    // Update selection to stay with the moved block
-    editorState.selection = Selection.single(
-      path: [nextIndex],
-      startOffset: savedSelection.start.offset,
-    );
-
-    Log.info('🔍 Swapped blocks at indices $currentIndex and $nextIndex');
-    Log.info(
-        '🔍 Document state after move down: ${editorState.document.toJson()}');
-
-    if (hadFocus && focusNode != null) {
-      focusNode!.requestFocus();
-    }
-
-    // Notify toolbar to update block type and selection
-    toolbarState.setSelectionInfo(
-      isVisible: true,
-      showTextStyles: !savedSelection.isCollapsed,
-      isDragMode: toolbarState.isDragMode,
-      selectionPath: [nextIndex],
-      previousSiblingType: getPreviousSiblingType(selection),
-    );
-
-    // Notify of document change
-    onDocumentChanged?.call();
   }
 }

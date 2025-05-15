@@ -22,6 +22,7 @@ class ToolbarButtonConfig {
 /// Manages the toolbar buttons for the journal editor, including drag and move actions.
 /// - Ensures drag button toggles isDragMode and sets initial selection if none exists.
 /// - Returns move up/down buttons in getDragButtons for drag submenu, inspired by epistle_editor.
+/// - Disables up arrow for the first reorderable block (visual index 0) to protect metadata block.
 /// - Includes debug logs with 🔍 prefix for button states and actions.
 /// - Compatible with AppFlowy 4.0.0 and single-editor drag-and-drop approach.
 class ToolbarButtons {
@@ -29,12 +30,16 @@ class ToolbarButtons {
   final ToolbarState toolbarState;
   final ToolbarActions actions;
   final FocusNode? focusNode;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   ToolbarButtons({
     required this.editorState,
     required this.toolbarState,
     required this.actions,
     this.focusNode,
+    this.onMoveUp,
+    this.onMoveDown,
   });
 
   List<ToolbarButtonConfig> getMainButtons() {
@@ -205,16 +210,21 @@ class ToolbarButtons {
   }
 
   List<ToolbarButtonConfig> getDragButtons() {
+    // Disable move up for the first reorderable block (visual index 0)
+    final isFirstBlock = toolbarState.currentSelectionPath != null &&
+        toolbarState.currentSelectionPath!.length == 1 &&
+        toolbarState.currentSelectionPath![0] == 0;
+
     return [
       ToolbarButtonConfig(
         key: 'move_up',
         icon: AppIcons.karrowLineUp,
-        onPressed: () => actions.handleMoveUp(),
+        onPressed: isFirstBlock ? null : onMoveUp,
       ),
       ToolbarButtonConfig(
         key: 'move_down',
         icon: AppIcons.karrowLineDown,
-        onPressed: () => actions.handleMoveDown(),
+        onPressed: onMoveDown,
       ),
     ];
   }
