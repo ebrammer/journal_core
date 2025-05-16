@@ -333,10 +333,10 @@ class ReorderableEditorState extends State<ReorderableEditor> {
         padding: EdgeInsets.fromLTRB(indent + 14, 8, 16, 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF2196F3).withOpacity(0.1)
+              ? theme.selectionBorder.withAlpha((0.05 * 255).round())
               : Colors.transparent,
           border: Border.all(
-            color: isSelected ? const Color(0xFF2196F3) : Colors.transparent,
+            color: isSelected ? theme.selectionBorder : Colors.transparent,
             width: isSelected ? 1 : 0,
           ),
           borderRadius: BorderRadius.circular(6),

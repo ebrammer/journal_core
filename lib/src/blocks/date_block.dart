@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:intl/intl.dart';
-import '../editor/editor_globals.dart';
 
 /// Constants for identifying a date block
 class DateBlockKeys {
@@ -75,7 +74,6 @@ class DateBlockComponentWidget extends StatelessWidget
   @override
   BlockComponentActionBuilder? get actionBuilder => null;
 
-  @override
   BlockComponentActionBuilder? get actionTrailingBuilder => null;
 
   @override
