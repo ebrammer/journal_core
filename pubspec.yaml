@@ -1,7 +1,8 @@
 name: journal_core
-description: "A new Flutter package project."
+description: Core block-based editor functionality for Steadfast Journal.
 version: 0.0.1
-homepage:
+homepage: https://github.com/ebrammer/journal_core
+repository: https://github.com/ebrammer/journal_core
 
 environment:
   sdk: ^3.6.1
@@ -12,7 +13,7 @@ dependencies:
     sdk: flutter
 
   # Core editor engine
-  appflowy_editor: 4.0.0
+  appflowy_editor: ^4.0.0
 
   # State management
   provider: ^6.1.2
