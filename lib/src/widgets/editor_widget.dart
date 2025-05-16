@@ -17,7 +17,7 @@ class EditorWidget extends StatefulWidget {
     required this.lastModified,
     required this.content,
     required this.onSave,
-    this.onBack,
+    required this.onBack,
   });
 
   final String title;
@@ -25,7 +25,7 @@ class EditorWidget extends StatefulWidget {
   final int lastModified;
   final String content;
   final Future Function(dynamic updatedJson) onSave;
-  final Future Function()? onBack;
+  final Future Function() onBack;
 
   @override
   State<EditorWidget> createState() => _EditorWidgetState();
@@ -190,22 +190,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                 children: [
                   IconButton(
                     icon: const Icon(JournalIcons.jarrowLeft, size: 24),
-                    onPressed: () async {
-                      // Save before navigating
-                      final content = _controller.getDocumentContent();
-                      await widget.onSave(jsonDecode(content));
-
-                      // Try to pop, if that fails (we're at root), navigate to root
-                      if (!Navigator.of(context).canPop()) {
-                        Navigator.of(context)
-                            .pushNamedAndRemoveUntil('/', (route) => false);
-                      } else {
-                        Navigator.of(context).pop();
-                      }
-
-                      // Dispose after navigation
-                      _controller.dispose();
-                    },
+                    onPressed: () => widget.onBack(),
                     color: Theme.of(context).iconTheme.color,
                     iconSize: 24.0,
                     constraints: const BoxConstraints(
