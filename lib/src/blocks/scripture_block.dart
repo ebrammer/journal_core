@@ -111,7 +111,6 @@ class ScriptureBlockComponentWidget extends StatelessWidget
   @override
   BlockComponentActionBuilder? get actionBuilder => null;
 
-  @override
   BlockComponentActionBuilder? get actionTrailingBuilder => null;
 
   @override
