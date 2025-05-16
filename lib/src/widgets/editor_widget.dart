@@ -200,15 +200,21 @@ class _EditorWidgetState extends State<EditorWidget> {
                     icon: const Icon(JournalIcons.jarrowLeft, size: 24),
                     onPressed: () async {
                       if (widget.onBack != null) {
+                        // Save before navigating
+                        final content = _controller.getDocumentContent();
+                        await widget.onSave(jsonDecode(content));
+
+                        // Call onBack first, then dispose
                         await widget.onBack!();
+                        _controller.dispose();
                       } else {
                         // Save before navigating
                         final content = _controller.getDocumentContent();
                         await widget.onSave(jsonDecode(content));
 
-                        // Ensure we dispose of the controller and its state before going back
-                        _controller.dispose();
+                        // Navigate first, then dispose
                         Navigator.of(context).pop();
+                        _controller.dispose();
                       }
                     },
                     color: Theme.of(context).iconTheme.color,
