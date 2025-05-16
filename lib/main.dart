@@ -58,6 +58,7 @@ class EditorPage extends StatefulWidget {
 class _EditorPageState extends State<EditorPage> {
   late final JournalEditorController _controller;
   late final EditorState _editorState;
+  late final ToolbarState _toolbarState;
 
   @override
   void initState() {
@@ -65,12 +66,17 @@ class _EditorPageState extends State<EditorPage> {
     final document = loadDocumentFromJson(
         '{"type":"page","children":[{"type":"paragraph","children":[{"type":"text","text":"Hello World!"}]}]}');
     _editorState = EditorState(document: document);
-    _controller = JournalEditorController(editorState: _editorState);
+    _toolbarState = ToolbarState();
+    _controller = JournalEditorController(
+      editorState: _editorState,
+      toolbarState: _toolbarState,
+    );
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _toolbarState.dispose();
     super.dispose();
   }
 

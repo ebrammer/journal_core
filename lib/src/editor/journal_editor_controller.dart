@@ -13,8 +13,10 @@ class JournalEditorController {
   final EditorState editorState;
   final ToolbarState toolbarState;
 
-  JournalEditorController({required this.editorState})
-      : toolbarState = ToolbarState();
+  JournalEditorController({
+    required this.editorState,
+    required this.toolbarState,
+  });
 
   /// Ensures a valid selection exists in the editor, setting a default if none is present.
   /// - Sets selection to the first non-metadata node's path if no selection exists and document is non-empty.

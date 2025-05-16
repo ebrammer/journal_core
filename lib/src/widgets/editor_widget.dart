@@ -35,6 +35,7 @@ class _EditorWidgetState extends State<EditorWidget> {
   late final EditorState _editorState;
   late final FocusNode _focusNode;
   late final JournalEditorController _controller;
+  late final ToolbarState _toolbarState;
   late List<int>? _selectedBlockPath;
   bool _showDeleteFab = true;
 
@@ -94,7 +95,11 @@ class _EditorWidgetState extends State<EditorWidget> {
     }
 
     _focusNode = FocusNode();
-    _controller = JournalEditorController(editorState: _editorState);
+    _toolbarState = ToolbarState();
+    _controller = JournalEditorController(
+      editorState: _editorState,
+      toolbarState: _toolbarState,
+    );
     _editorState.selectionNotifier.addListener(_onSelectionChanged);
 
     _titleFocusNode.addListener(() {
@@ -158,6 +163,7 @@ class _EditorWidgetState extends State<EditorWidget> {
     _titleFocusNode.dispose();
     _focusNode.dispose();
     _controller.dispose();
+    _toolbarState.dispose();
     EditorGlobals.editorState = null;
     super.dispose();
   }
@@ -176,8 +182,8 @@ class _EditorWidgetState extends State<EditorWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
-    return ChangeNotifierProvider<ToolbarState>(
-      create: (_) => _controller.toolbarState,
+    return ChangeNotifierProvider<ToolbarState>.value(
+      value: _toolbarState,
       child: Scaffold(
         backgroundColor: theme.primaryBackground,
         appBar: AppBar(
