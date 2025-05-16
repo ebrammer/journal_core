@@ -158,7 +158,7 @@ class JournalEditorController {
 
   /// Disposes of resources held by the controller.
   void dispose() {
-    toolbarState.dispose();
+    editorState.dispose();
     Log.info('🔍 JournalEditorController disposed');
   }
 }
