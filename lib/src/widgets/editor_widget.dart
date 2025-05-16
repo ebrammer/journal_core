@@ -153,19 +153,12 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   void dispose() {
-    // First remove listeners
     _editorState.selectionNotifier.removeListener(_onSelectionChanged);
-    _titleFocusNode.removeListener(() {});
-
-    // Then dispose controllers and focus nodes
     titleController.dispose();
     _titleFocusNode.dispose();
     _focusNode.dispose();
-
-    // Finally dispose the editor controller and clean up globals
     _controller.dispose();
     EditorGlobals.editorState = null;
-
     super.dispose();
   }
 
@@ -173,7 +166,6 @@ class _EditorWidgetState extends State<EditorWidget> {
     Log.info('🔄 Selection changed to: ${_editorState.selection}');
     _controller.syncToolbarWithSelection();
     _updateSelectedBlockPath();
-    // Reset FAB visibility when selection changes
     if (mounted) {
       setState(() {
         _showDeleteFab = true;
