@@ -1,0 +1,19 @@
+name: journal_core_example
+description: Example app for testing journal_core
+publish_to: "none"
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  journal_core:
+    path: ../
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: JournalIcons
+      fonts:
+        - asset: assets/fonts/journal_icons.ttf

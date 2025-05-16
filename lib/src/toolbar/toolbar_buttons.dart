@@ -98,7 +98,7 @@ class ToolbarButtons {
       ),
       ToolbarButtonConfig(
         key: 'quote',
-        icon: AppIcons.kalignLeftSimple,
+        icon: JournalIcons.jalignLeftSimple,
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleInsertQuote(),
         isActive: () {
@@ -124,13 +124,13 @@ class ToolbarButtons {
       if (canIndentNode)
         ToolbarButtonConfig(
           key: 'outdent',
-          icon: AppIcons.ktextOutdent,
+          icon: JournalIcons.jtextOutdent,
           onPressed: canOutdent ? () => actions.handleOutdent() : null,
         ),
       if (canIndentNode)
         ToolbarButtonConfig(
           key: 'indent',
-          icon: AppIcons.ktextIndent,
+          icon: JournalIcons.jtextIndent,
           onPressed: canIndent ? () => actions.handleIndent() : null,
         ),
       if (!['todo_list', 'bulleted_list', 'numbered_list', 'quote']
@@ -144,14 +144,14 @@ class ToolbarButtons {
         ),
       ToolbarButtonConfig(
         key: 'undo',
-        icon: AppIcons.karrowArcLeft,
+        icon: JournalIcons.jarrowArcLeft,
         onPressed: toolbarState.isDragMode
             ? null
             : () => editorState.undoManager.undo(),
       ),
       ToolbarButtonConfig(
         key: 'redo',
-        icon: AppIcons.karrowArcRight,
+        icon: JournalIcons.jarrowArcRight,
         onPressed: toolbarState.isDragMode
             ? null
             : () => editorState.undoManager.redo(),
@@ -163,17 +163,17 @@ class ToolbarButtons {
     return [
       ToolbarButtonConfig(
         key: 'insert_above',
-        icon: AppIcons.krowsPlusTop,
+        icon: JournalIcons.jrowsPlusTop,
         onPressed: () => actions.handleInsertAbove(),
       ),
       ToolbarButtonConfig(
         key: 'insert_below',
-        icon: AppIcons.krowsPlusBottom,
+        icon: JournalIcons.jrowsPlusBottom,
         onPressed: () => actions.handleInsertBelow(),
       ),
       ToolbarButtonConfig(
         key: 'divider',
-        icon: AppIcons.kminus,
+        icon: JournalIcons.jminus,
         onPressed: () => actions.handleInsertDivider(),
         isActive: () => toolbarState.currentBlockType == 'divider',
       ),
@@ -184,25 +184,25 @@ class ToolbarButtons {
     return [
       ToolbarButtonConfig(
         key: 'bold',
-        icon: AppIcons.ktextB,
+        icon: JournalIcons.jtextB,
         onPressed: () => actions.handleToggleStyle('bold'),
         isActive: () => toolbarState.isStyleBold,
       ),
       ToolbarButtonConfig(
         key: 'italic',
-        icon: AppIcons.ktextItalic,
+        icon: JournalIcons.jtextItalic,
         onPressed: () => actions.handleToggleStyle('italic'),
         isActive: () => toolbarState.isStyleItalic,
       ),
       ToolbarButtonConfig(
         key: 'underline',
-        icon: AppIcons.ktextUnderline,
+        icon: JournalIcons.jtextUnderline,
         onPressed: () => actions.handleToggleStyle('underline'),
         isActive: () => toolbarState.isStyleUnderline,
       ),
       ToolbarButtonConfig(
         key: 'strikethrough',
-        icon: AppIcons.ktextStrikethrough,
+        icon: JournalIcons.jtextStrikethrough,
         onPressed: () => actions.handleToggleStyle('strikethrough'),
         isActive: () => toolbarState.isStyleStrikethrough,
       ),
@@ -218,12 +218,12 @@ class ToolbarButtons {
     return [
       ToolbarButtonConfig(
         key: 'move_up',
-        icon: AppIcons.karrowLineUp,
+        icon: JournalIcons.jarrowLineUp,
         onPressed: isFirstBlock ? null : onMoveUp,
       ),
       ToolbarButtonConfig(
         key: 'move_down',
-        icon: AppIcons.karrowLineDown,
+        icon: JournalIcons.jarrowLineDown,
         onPressed: onMoveDown,
       ),
     ];
@@ -232,38 +232,38 @@ class ToolbarButtons {
   IconData _getHeadingIcon() {
     if (toolbarState.currentBlockType == 'heading') {
       return toolbarState.headingLevel == 2
-          ? AppIcons.ktextHTwo
-          : AppIcons.ktextHThree;
+          ? JournalIcons.jtextHTwo
+          : JournalIcons.jtextHThree;
     }
-    return AppIcons.kparagraph;
+    return JournalIcons.jparagraph;
   }
 
   IconData _getListIcon() {
     switch (toolbarState.currentBlockType) {
       case 'todo_list':
-        return AppIcons.kcheckSquare;
+        return JournalIcons.jcheckSquare;
       case 'bulleted_list':
-        return AppIcons.klistBullets;
+        return JournalIcons.jlistBullets;
       case 'numbered_list':
-        return AppIcons.klistNumbers;
+        return JournalIcons.jlistNumbers;
       default:
-        return AppIcons.klistBullets;
+        return JournalIcons.jlistBullets;
     }
   }
 
   IconData _getAlignmentIcon() {
     final selection = editorState.selection;
-    if (selection == null) return AppIcons.ktextAlignLeft;
+    if (selection == null) return JournalIcons.jtextAlignLeft;
     final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) return AppIcons.ktextAlignLeft;
+    if (node == null) return JournalIcons.jtextAlignLeft;
     final align = node.attributes['align'] as String? ?? 'left';
     switch (align) {
       case 'center':
-        return AppIcons.ktextAlignCenter;
+        return JournalIcons.jtextAlignCenter;
       case 'right':
-        return AppIcons.ktextAlignRight;
+        return JournalIcons.jtextAlignRight;
       default:
-        return AppIcons.ktextAlignLeft;
+        return JournalIcons.jtextAlignLeft;
     }
   }
 }

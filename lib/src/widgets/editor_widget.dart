@@ -189,7 +189,7 @@ class _EditorWidgetState extends State<EditorWidget> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(AppIcons.karrowLeft, size: 24),
+                    icon: const Icon(JournalIcons.jarrowLeft, size: 24),
                     onPressed: () => Navigator.of(context).pop(),
                     color: Theme.of(context).iconTheme.color,
                     iconSize: 24.0,
@@ -221,7 +221,7 @@ class _EditorWidgetState extends State<EditorWidget> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(AppIcons.ktrash, size: 20),
+                    icon: const Icon(JournalIcons.jtrash, size: 20),
                     onPressed: () {
                       showDialog(
                         context: context,
@@ -462,7 +462,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(AppIcons.kxCircle, size: 14),
+                                const Icon(JournalIcons.jxCircle, size: 14),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Divider',
