@@ -151,12 +151,19 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   void dispose() {
+    // First remove listeners
     _editorState.selectionNotifier.removeListener(_onSelectionChanged);
+    _titleFocusNode.removeListener(() {});
+
+    // Then dispose controllers and focus nodes
     titleController.dispose();
     _titleFocusNode.dispose();
     _focusNode.dispose();
+
+    // Finally dispose the editor controller and clean up globals
     _controller.dispose();
-    EditorGlobals.editorState = null; // Clean up the global editor state
+    EditorGlobals.editorState = null;
+
     super.dispose();
   }
 
@@ -189,7 +196,15 @@ class _EditorWidgetState extends State<EditorWidget> {
                 children: [
                   IconButton(
                     icon: const Icon(JournalIcons.jarrowLeft, size: 24),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      // Save before navigating
+                      final content = _controller.getDocumentContent();
+                      widget.onSave(jsonDecode(content)).then((_) {
+                        // Ensure we dispose of the controller and its state before popping
+                        _controller.dispose();
+                        Navigator.of(context).pop();
+                      });
+                    },
                     color: Theme.of(context).iconTheme.color,
                     iconSize: 24.0,
                     constraints: const BoxConstraints(
