@@ -26,6 +26,7 @@ class JournalExampleApp extends StatelessWidget {
             content:
                 '{"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":"Hello world!"}]}}]}}',
             onSave: (updatedJson) async => debugPrint("Saved: $updatedJson"),
+            onBack: () async => Navigator.of(context).pop(),
           ),
         ),
       ),
