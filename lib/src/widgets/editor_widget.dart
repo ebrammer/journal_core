@@ -93,17 +93,7 @@ class _EditorWidgetState extends State<EditorWidget> {
 
     _focusNode = FocusNode();
     _controller = JournalEditorController(editorState: _editorState);
-    _editorState.selectionNotifier.addListener(() {
-      Log.info('🔄 Selection changed to: ${_editorState.selection}');
-      _controller.syncToolbarWithSelection();
-      _updateSelectedBlockPath();
-      // Reset FAB visibility when selection changes
-      if (mounted) {
-        setState(() {
-          _showDeleteFab = true;
-        });
-      }
-    });
+    _editorState.selectionNotifier.addListener(_onSelectionChanged);
 
     _titleFocusNode.addListener(() {
       if (_titleFocusNode.hasFocus) {
@@ -161,16 +151,25 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   void dispose() {
-    _editorState.selectionNotifier.removeListener(() {
-      Log.info('🔄 Selection changed to: ${_editorState.selection}');
-      _controller.syncToolbarWithSelection();
-    });
+    _editorState.selectionNotifier.removeListener(_onSelectionChanged);
     titleController.dispose();
     _titleFocusNode.dispose();
     _focusNode.dispose();
     _controller.dispose();
     EditorGlobals.editorState = null; // Clean up the global editor state
     super.dispose();
+  }
+
+  void _onSelectionChanged() {
+    Log.info('🔄 Selection changed to: ${_editorState.selection}');
+    _controller.syncToolbarWithSelection();
+    _updateSelectedBlockPath();
+    // Reset FAB visibility when selection changes
+    if (mounted) {
+      setState(() {
+        _showDeleteFab = true;
+      });
+    }
   }
 
   @override
