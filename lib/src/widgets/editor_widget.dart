@@ -196,7 +196,24 @@ class _EditorWidgetState extends State<EditorWidget> {
                 children: [
                   IconButton(
                     icon: const Icon(JournalIcons.jarrowLeft, size: 24),
-                    onPressed: () => widget.onBack(),
+                    onPressed: () async {
+                      // Save before navigating
+                      final content = _controller.getDocumentContent();
+                      await widget.onSave(jsonDecode(content));
+
+                      // Call the onBack callback if provided
+                      if (widget.onBack != null) {
+                        await widget.onBack!();
+                      } else {
+                        // Fallback to default navigation if no callback provided
+                        if (!Navigator.of(context).canPop()) {
+                          Navigator.of(context)
+                              .pushNamedAndRemoveUntil('/', (route) => false);
+                        } else {
+                          Navigator.of(context).pop();
+                        }
+                      }
+                    },
                     color: Theme.of(context).iconTheme.color,
                     iconSize: 24.0,
                     constraints: const BoxConstraints(
