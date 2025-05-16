@@ -199,23 +199,20 @@ class _EditorWidgetState extends State<EditorWidget> {
                   IconButton(
                     icon: const Icon(JournalIcons.jarrowLeft, size: 24),
                     onPressed: () async {
-                      if (widget.onBack != null) {
-                        // Save before navigating
-                        final content = _controller.getDocumentContent();
-                        await widget.onSave(jsonDecode(content));
+                      // Save before navigating
+                      final content = _controller.getDocumentContent();
+                      await widget.onSave(jsonDecode(content));
 
-                        // Call onBack first, then dispose
-                        await widget.onBack!();
-                        _controller.dispose();
+                      // Try to pop, if that fails (we're at root), navigate to root
+                      if (!Navigator.of(context).canPop()) {
+                        Navigator.of(context)
+                            .pushNamedAndRemoveUntil('/', (route) => false);
                       } else {
-                        // Save before navigating
-                        final content = _controller.getDocumentContent();
-                        await widget.onSave(jsonDecode(content));
-
-                        // Navigate first, then dispose
                         Navigator.of(context).pop();
-                        _controller.dispose();
                       }
+
+                      // Dispose after navigation
+                      _controller.dispose();
                     },
                     color: Theme.of(context).iconTheme.color,
                     iconSize: 24.0,
