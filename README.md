@@ -1,8 +1,3 @@
-Absolutely — here’s a cleaned-up, accurate version of your `README.md` for the `journal_core` package, based on what you’re actually building:
-
----
-
-````md
 # journal_core
 
 A reusable, modular content editor for Flutter and FlutterFlow, built on top of [AppFlowy Editor](https://github.com/AppFlowy-IO/appflowy_editor).  
@@ -31,6 +26,7 @@ dependencies:
     git:
       url: https://github.com/ebrammer/journal_core.git
 ```
+
 ````
 
 Then import it:
@@ -99,3 +95,4 @@ If you find a bug or something doesn't work inside FlutterFlow, please [open an 
 ## 📜 License
 
 MIT © 2024–2025 Evan Brammer
+````
