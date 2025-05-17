@@ -109,7 +109,9 @@ class _JournalToolbarState extends State<JournalToolbar> {
                   children: [
                     _buildToolbarButton(ToolbarButtonConfig(
                       key: 'menu_toggle',
-                      icon: isSubMenu ? FFIcons.kxCircle : FFIcons.kplusCircle,
+                      icon: isSubMenu
+                          ? JournalIcons.jxCircle
+                          : JournalIcons.jplusCircle,
                       onPressed: isSubMenu
                           ? () {
                               setState(() {
@@ -183,7 +185,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                     else ...[
                       _buildToolbarButton(ToolbarButtonConfig(
                         key: 'drag',
-                        icon: FFIcons.karrowsDownUp,
+                        icon: JournalIcons.jarrowsDownUp,
                         onPressed: () {
                           toolbarState.isDragMode = !toolbarState.isDragMode;
                           // Ensure a selection exists to keep toolbar visible
@@ -200,7 +202,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                       )),
                       _buildToolbarButton(ToolbarButtonConfig(
                         key: 'keyboard',
-                        icon: FFIcons.kkeyboard,
+                        icon: JournalIcons.jkeyboard,
                         onPressed: () {
                           Log.info(
                               '🔧 Keyboard button tapped, unfocusing editor');

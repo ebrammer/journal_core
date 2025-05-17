@@ -195,7 +195,7 @@ class _EditorWidgetState extends State<EditorWidget> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(FFIcons.karrowLeft, size: 24),
+                    icon: const Icon(JournalIcons.jarrowLeft, size: 24),
                     onPressed: () async {
                       // Save before navigating
                       final content = _controller.getDocumentContent();
@@ -244,7 +244,7 @@ class _EditorWidgetState extends State<EditorWidget> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(FFIcons.ktrash, size: 20),
+                    icon: const Icon(JournalIcons.jtrash, size: 20),
                     onPressed: () {
                       showDialog(
                         context: context,
@@ -485,7 +485,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(FFIcons.kxCircle, size: 14),
+                                const Icon(JournalIcons.jxCircle, size: 14),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Divider',

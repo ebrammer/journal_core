@@ -1,6 +1,8 @@
 name: journal_core_example
-description: Example app for testing journal_core
+description: A test app for journal_core
 publish_to: "none"
+
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -13,7 +15,11 @@ dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/fonts/
+
   fonts:
-    - family: JournalIcons
+    - family: Steadfast
       fonts:
-        - asset: assets/fonts/journal_icons.ttf
+        - asset: assets/fonts/steadfast.ttf
