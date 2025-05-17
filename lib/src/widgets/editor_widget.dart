@@ -189,128 +189,124 @@ class _EditorWidgetState extends State<EditorWidget> {
         appBar: AppBar(
           backgroundColor: theme.primaryBackground,
           elevation: 0,
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(JournalIcons.jarrowLeft, size: 24),
-                    onPressed: () async {
-                      // Save before navigating
-                      final content = _controller.getDocumentContent();
-                      await widget.onSave(jsonDecode(content));
+          titleSpacing: 0,
+          leadingWidth: 0,
+          automaticallyImplyLeading: false,
+          title: Padding(
+            padding: const EdgeInsets.only(left: 4, right: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(JournalIcons.jarrowLeft, size: 24),
+                      onPressed: () async {
+                        // Save before navigating
+                        final content = _controller.getDocumentContent();
+                        await widget.onSave(jsonDecode(content));
 
-                      // Call the onBack callback if provided
-                      if (widget.onBack != null) {
-                        await widget.onBack!();
-                      } else {
-                        // Fallback to default navigation if no callback provided
-                        if (!Navigator.of(context).canPop()) {
-                          Navigator.of(context)
-                              .pushNamedAndRemoveUntil('/', (route) => false);
-                        } else {
-                          Navigator.of(context).pop();
-                        }
-                      }
-                    },
-                    color: Theme.of(context).iconTheme.color,
-                    iconSize: 24.0,
-                    constraints: const BoxConstraints(
-                      minWidth: 24,
-                      minHeight: 24,
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(width: 8.0),
-                  if (_showCollapsedTitle)
-                    Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.6,
+                        // Call the onBack callback
+                        await widget.onBack();
+                      },
+                      color: Theme.of(context).iconTheme.color,
+                      iconSize: 24.0,
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
                       ),
-                      child: Text(
-                        _currentTitle.isEmpty ? 'Title' : _currentTitle,
-                        style: TextStyle(
-                          fontSize: 16.0,
-                          fontWeight: FontWeight.w400,
-                          color: theme.primaryText,
-                          letterSpacing: 0.5,
+                      padding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(width: 8.0),
+                    if (_showCollapsedTitle)
+                      Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.6,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        child: Text(
+                          _currentTitle.isEmpty ? 'Title' : _currentTitle,
+                          style: TextStyle(
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.w400,
+                            color: theme.primaryText,
+                            letterSpacing: 0.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                ],
-              ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(JournalIcons.jtrash, size: 20),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return AlertDialog(
-                            title: const Text('Delete Journal'),
-                            content: const Text(
-                                'Are you sure you want to delete this journal? This action cannot be undone.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop(); // Close dialog
-                                  Navigator.of(context)
-                                      .pop(); // Go back to previous page
-                                  widget.onSave(null);
-                                },
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red,
+                  ],
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(JournalIcons.jtrash, size: 20),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text('Delete Journal'),
+                              content: const Text(
+                                  'Are you sure you want to delete this journal? This action cannot be undone.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
                                 ),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                    color: Theme.of(context).iconTheme.color,
-                    iconSize: 24.0,
-                    constraints: const BoxConstraints(
-                      minWidth: 24,
-                      minHeight: 24,
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(); // Close dialog
+                                    Navigator.of(context)
+                                        .pop(); // Go back to previous page
+                                    widget.onSave(null);
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                      color: Theme.of(context).iconTheme.color,
+                      iconSize: 24.0,
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 24,
+                      ),
+                      padding: EdgeInsets.zero,
                     ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(width: 12.0),
-                  TextButton(
-                    onPressed: () async {
-                      final content = _controller.getDocumentContent();
-                      await widget.onSave(jsonDecode(content));
-                      Log.info('🔍 Saved document content: $content');
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: theme.primaryText,
-                      foregroundColor: theme.primaryBackground,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8.0, vertical: 6.0),
-                      minimumSize: const Size(0, 0),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
+                    const SizedBox(width: 12.0),
+                    TextButton(
+                      onPressed: () async {
+                        final content = _controller.getDocumentContent();
+                        await widget.onSave(jsonDecode(content));
+                        Log.info('🔍 Saved document content: $content');
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: theme.primaryText,
+                        foregroundColor: theme.primaryBackground,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8.0, vertical: 6.0),
+                        minimumSize: const Size(0, 0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: const Text(
+                        'Done',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         body: Container(

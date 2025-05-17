@@ -16,19 +16,51 @@ class JournalExampleApp extends StatelessWidget {
           surface: JournalTheme.light().primaryBackground,
         ),
       ),
-      home: Scaffold(
-        backgroundColor: JournalTheme.light().primaryBackground,
-        body: SafeArea(
-          child: EditorWidget(
-            title: 'Test Entry',
-            createdAt: DateTime.now().millisecondsSinceEpoch,
-            lastModified: DateTime.now().millisecondsSinceEpoch,
-            content:
-                '{"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":"Hello world!"}]}}]}}',
-            onSave: (updatedJson) async => debugPrint("Saved: $updatedJson"),
-            onBack: () async => Navigator.of(context).pop(),
+      home: const HomeScreen(),
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: JournalTheme.light().primaryBackground,
+      body: SafeArea(
+        child: Center(
+          child: TextButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const EditorScreen(),
+                ),
+              );
+            },
+            child: const Text('Open Editor'),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class EditorScreen extends StatelessWidget {
+  const EditorScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: JournalTheme.light().primaryBackground,
+      body: EditorWidget(
+        title: 'Test Entry',
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        lastModified: DateTime.now().millisecondsSinceEpoch,
+        content:
+            '{"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":"Hello world!"}]}}]}}',
+        onSave: (updatedJson) async => debugPrint("Saved: $updatedJson"),
+        onBack: () async => Navigator.of(context).pop(),
       ),
     );
   }

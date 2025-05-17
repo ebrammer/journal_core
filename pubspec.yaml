@@ -1,6 +1,6 @@
 name: journal_core
 description: Core block-based editor functionality for Steadfast Journal.
-version: 0.0.6
+version: 0.0.7
 homepage: https://github.com/ebrammer/journal_core
 repository: https://github.com/ebrammer/journal_core
 
