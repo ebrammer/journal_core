@@ -20,6 +20,6 @@ flutter:
     - assets/fonts/
 
   fonts:
-    - family: Steadfast
+    - family: Syllabi
       fonts:
-        - asset: assets/fonts/steadfast.ttf
+        - asset: assets/fonts/syllabi.ttf

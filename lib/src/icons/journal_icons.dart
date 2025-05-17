@@ -8,7 +8,7 @@
 import 'package:flutter/widgets.dart';
 
 class JournalIcons {
-  static const String _fontFamily = 'Steadfast'; // <-- from FFIcons
+  static const String _fontFamily = 'Syllabi'; // <-- from FFIcons
 
   static const IconData jbiblethin = IconData(0xe900, fontFamily: _fontFamily);
   static const IconData jsteadfast = IconData(0xe901, fontFamily: _fontFamily);
