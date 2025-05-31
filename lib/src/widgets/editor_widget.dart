@@ -60,7 +60,7 @@ class _EditorWidgetState extends State<EditorWidget> {
     _selectedBlockPath = null;
 
     Log.info('Initializing editor state with content...');
-    final document = loadDocumentFromJson(widget.content);
+    final document = ensureValidEditorDocument(widget.content);
     _editorState = EditorState(document: document);
     EditorGlobals.editorState = _editorState; // Set the global editor state
 

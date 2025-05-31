@@ -2,6 +2,52 @@
 
 import 'dart:convert';
 import 'package:appflowy_editor/appflowy_editor.dart'; // AppFlowy dependencies
+import 'package:journal_core/journal_core.dart';
+
+/// Ensures a valid editor document is created from raw JSON input.
+/// Handles null, empty, and malformed input gracefully.
+Document ensureValidEditorDocument(String? rawJson) {
+  if (rawJson == null || rawJson.trim().isEmpty) {
+    Log.warn('[journal_core] Null or empty content. Using blank document.');
+    return _defaultDocument();
+  }
+
+  try {
+    final decoded = jsonDecode(rawJson);
+    if (decoded is Map<String, dynamic> && decoded.containsKey('document')) {
+      try {
+        return Document.fromJson(decoded);
+      } catch (e) {
+        Log.error('[journal_core] Failed to create document from JSON: $e');
+        return _defaultDocument();
+      }
+    }
+    Log.warn('[journal_core] JSON missing document key. Using blank document.');
+  } catch (e) {
+    Log.error('[journal_core] JSON parse failed: $e');
+  }
+
+  return _defaultDocument();
+}
+
+/// Creates a default empty document with a single empty paragraph.
+Document _defaultDocument() {
+  return Document(
+    root: Node(
+      type: 'page',
+      children: [
+        Node(
+          type: 'paragraph',
+          attributes: {
+            'delta': [
+              {'insert': ''}
+            ]
+          },
+        ),
+      ],
+    ),
+  );
+}
 
 /// Function to load content from raw JSON string into a Document
 Document loadDocumentFromJson(String content) {
