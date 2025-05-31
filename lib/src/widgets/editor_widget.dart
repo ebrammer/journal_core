@@ -10,23 +10,18 @@ import 'package:journal_core/src/blocks/divider_block.dart' as divider;
 import '../theme/journal_theme.dart';
 import '../editor/editor_globals.dart';
 import '../models/block_type_constants.dart';
+import '../models/journal.dart';
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
     super.key,
-    required this.title,
-    required this.createdAt,
-    required this.lastModified,
-    required this.content,
+    required this.journal,
     required this.onSave,
     required this.onBack,
   });
 
-  final String title;
-  final int createdAt;
-  final int lastModified;
-  final String content;
-  final Future Function(dynamic updatedJson) onSave;
+  final Journal journal;
+  final Future Function(Journal updatedJournal) onSave;
   final Future Function() onBack;
 
   @override
@@ -56,13 +51,13 @@ class _EditorWidgetState extends State<EditorWidget> {
   void initState() {
     super.initState();
 
-    _currentTitle = widget.title;
+    _currentTitle = widget.journal.title;
     titleController = TextEditingController(text: _currentTitle);
     _titleFocusNode = FocusNode();
     _selectedBlockPath = null;
 
     Log.info('Initializing editor state with content...');
-    final document = ensureValidEditorDocument(widget.content);
+    final document = widget.journal.content;
     _editorState = EditorState(document: document);
     EditorGlobals.editorState = _editorState; // Set the global editor state
 
@@ -74,7 +69,7 @@ class _EditorWidgetState extends State<EditorWidget> {
           [0],
           Node(
             type: BlockTypeConstants.metadata,
-            attributes: {'created_at': widget.createdAt},
+            attributes: {'created_at': widget.journal.createdAt},
           ));
     }
     // Keep bottom spacer_block
@@ -206,7 +201,13 @@ class _EditorWidgetState extends State<EditorWidget> {
                       onPressed: () async {
                         // Save before navigating
                         final content = _controller.getDocumentContent();
-                        await widget.onSave(jsonDecode(content));
+                        await widget.onSave(Journal(
+                          id: widget.journal.id,
+                          title: _currentTitle,
+                          createdAt: widget.journal.createdAt,
+                          lastModified: DateTime.now().millisecondsSinceEpoch,
+                          content: _editorState.document,
+                        ));
 
                         // Call the onBack callback
                         await widget.onBack();
@@ -260,7 +261,14 @@ class _EditorWidgetState extends State<EditorWidget> {
                                     Navigator.of(context).pop(); // Close dialog
                                     Navigator.of(context)
                                         .pop(); // Go back to previous page
-                                    widget.onSave(null);
+                                    widget.onSave(Journal(
+                                      id: widget.journal.id,
+                                      title: _currentTitle,
+                                      createdAt: widget.journal.createdAt,
+                                      lastModified:
+                                          DateTime.now().millisecondsSinceEpoch,
+                                      content: _editorState.document,
+                                    ));
                                   },
                                   style: TextButton.styleFrom(
                                     foregroundColor: Colors.red,
@@ -284,8 +292,20 @@ class _EditorWidgetState extends State<EditorWidget> {
                     TextButton(
                       onPressed: () async {
                         final content = _controller.getDocumentContent();
-                        await widget.onSave(jsonDecode(content));
-                        Log.info('🔍 Saved document content: $content');
+                        await widget.onSave(Journal(
+                          id: widget.journal.id,
+                          title: _currentTitle,
+                          createdAt: widget.journal.createdAt,
+                          lastModified: DateTime.now().millisecondsSinceEpoch,
+                          content: _editorState.document,
+                        ));
+                        Log.info('🔍 Saved journal: ${Journal(
+                          id: widget.journal.id,
+                          title: _currentTitle,
+                          createdAt: widget.journal.createdAt,
+                          lastModified: DateTime.now().millisecondsSinceEpoch,
+                          content: _editorState.document,
+                        ).toJson()}');
                       },
                       style: TextButton.styleFrom(
                         backgroundColor: theme.primaryText,
@@ -345,8 +365,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                                   onBlockSelected: _onBlockSelected,
                                   onDocumentChanged: (List<int>? newPath) =>
                                       _onDocumentChanged(newPath),
-                                  titleController: titleController,
-                                  createdAt: widget.createdAt,
+                                  journal: widget.journal,
                                   onTitleChanged: (value) {
                                     setState(() {
                                       _currentTitle = value;
@@ -378,7 +397,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                                 'spacer_block': spacerBlockBuilder,
                                 'metadata_block': MetadataBlockBuilder(
                                   titleController: titleController,
-                                  createdAt: widget.createdAt,
+                                  createdAt: widget.journal.createdAt,
                                   onTitleChanged: (value) {
                                     setState(() {
                                       _currentTitle = value;
@@ -423,9 +442,15 @@ class _EditorWidgetState extends State<EditorWidget> {
                     editorState: _editorState,
                     controller: _controller,
                     onSave: () async {
-                      final content = _controller.getDocumentContent();
-                      await widget.onSave(jsonDecode(content));
-                      Log.info('🔍 Saved document content: $content');
+                      final updatedJournal = Journal(
+                        id: widget.journal.id,
+                        title: _currentTitle,
+                        createdAt: widget.journal.createdAt,
+                        lastModified: DateTime.now().millisecondsSinceEpoch,
+                        content: _editorState.document,
+                      );
+                      await widget.onSave(updatedJournal);
+                      Log.info('🔍 Saved journal: ${updatedJournal.toJson()}');
                     },
                     focusNode: _focusNode,
                     onDocumentChanged: () => _onDocumentChanged(),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:journal_core/src/theme/journal_theme.dart';
+import 'dart:convert';
+import 'package:appflowy_editor/appflowy_editor.dart';
 
 void main() => runApp(const JournalExampleApp());
 
@@ -54,12 +56,17 @@ class EditorScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: JournalTheme.light().primaryBackground,
       body: EditorWidget(
-        title: 'Test Entry',
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        lastModified: DateTime.now().millisecondsSinceEpoch,
-        content:
+        journal: Journal(
+          id: 'test-entry',
+          title: 'Test Entry',
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+          lastModified: DateTime.now().millisecondsSinceEpoch,
+          content: Document.fromJson(jsonDecode(
             '{"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":"Hello world!"}]}}]}}',
-        onSave: (updatedJson) async => debugPrint("Saved: $updatedJson"),
+          )),
+        ),
+        onSave: (updatedJournal) async =>
+            debugPrint("Saved: ${updatedJournal.toJson()}"),
         onBack: () async => Navigator.of(context).pop(),
       ),
     );

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:journal_core/journal_core.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'dart:convert';
+import 'package:journal_core/journal_core.dart';
+import 'package:journal_core/src/models/journal.dart';
+import 'package:journal_core/src/models/block_type_constants.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,37 +14,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Journal Core Demo',
+      title: 'Journal Editor',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const MyHomePage(),
-    );
-  }
-}
-
-class MyHomePage extends StatelessWidget {
-  const MyHomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Journal Core Demo'),
-      ),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const EditorPage(),
-              ),
-            );
-          },
-          child: const Text('Open Editor'),
-        ),
-      ),
+      home: const EditorPage(),
     );
   }
 }
@@ -62,8 +38,26 @@ class _EditorPageState extends State<EditorPage> {
   @override
   void initState() {
     super.initState();
-    final document = loadDocumentFromJson(
-        '{"type":"page","children":[{"type":"paragraph","children":[{"type":"text","text":"Hello World!"}]}]}');
+    final document = Document(
+      root: Node(
+        type: BlockTypeConstants.page,
+        children: [
+          Node(
+            type: BlockTypeConstants.paragraph,
+            children: [
+              Node(
+                type: 'text',
+                attributes: {
+                  'delta': [
+                    {'insert': 'Hello World!'}
+                  ]
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
     _editorState = EditorState(document: document);
     _controller = JournalEditorController(
       editorState: _editorState,
@@ -77,25 +71,35 @@ class _EditorPageState extends State<EditorPage> {
     super.dispose();
   }
 
-  Future<void> _handleSave(dynamic json) async {
+  Future<void> _handleSave(Journal journal) async {
     // Handle save logic here
-    print('Saving content: $json');
+    print('Saving journal: ${journal.toJson()}');
   }
 
   @override
   Widget build(BuildContext context) {
-    return EditorWidget(
+    final journal = Journal(
+      id: 'test-journal',
       title: 'Test Journal',
       createdAt: DateTime.now().millisecondsSinceEpoch,
       lastModified: DateTime.now().millisecondsSinceEpoch,
-      content:
-          '{"type":"page","children":[{"type":"paragraph","children":[{"type":"text","text":"Hello World!"}]}]}',
+      content: _editorState.document,
+    );
+
+    return EditorWidget(
+      journal: journal,
       onSave: _handleSave,
       onBack: () async {
         // Get the current content before navigating
-        final content = _controller.getDocumentContent();
+        final updatedJournal = Journal(
+          id: journal.id,
+          title: journal.title,
+          createdAt: journal.createdAt,
+          lastModified: DateTime.now().millisecondsSinceEpoch,
+          content: _editorState.document,
+        );
         // Save the content
-        await _handleSave(jsonDecode(content));
+        await _handleSave(updatedJournal);
         // Navigate back
         if (mounted) {
           Navigator.of(context).pop();
