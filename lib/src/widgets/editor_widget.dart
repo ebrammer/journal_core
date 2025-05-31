@@ -8,6 +8,8 @@ import 'dart:convert';
 import 'package:journal_core/src/utils/focus_helpers.dart';
 import 'package:journal_core/src/blocks/divider_block.dart' as divider;
 import '../theme/journal_theme.dart';
+import '../editor/editor_globals.dart';
+import '../models/block_type_constants.dart';
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
@@ -67,21 +69,21 @@ class _EditorWidgetState extends State<EditorWidget> {
     final transaction = _editorState.transaction;
     // Insert metadata_block at the top instead of spacer_block
     if (document.root.children.isEmpty ||
-        document.root.children.first.type != 'metadata_block') {
+        document.root.children.first.type != BlockTypeConstants.metadata) {
       transaction.insertNode(
           [0],
           Node(
-            type: 'metadata_block',
+            type: BlockTypeConstants.metadata,
             attributes: {'created_at': widget.createdAt},
           ));
     }
     // Keep bottom spacer_block
     if (document.root.children.isEmpty ||
-        document.root.children.last.type != 'spacer_block') {
+        document.root.children.last.type != BlockTypeConstants.spacer) {
       transaction.insertNode(
           [document.root.children.length],
           Node(
-            type: 'spacer_block',
+            type: BlockTypeConstants.spacer,
             attributes: {'height': 100},
           ));
     }
@@ -515,7 +517,8 @@ class _EditorWidgetState extends State<EditorWidget> {
     final children = _editorState.document.root.children;
     for (int i = 0; i < children.length; i++) {
       final node = children[i];
-      if (node.type != 'metadata_block' && node.type != 'spacer_block') {
+      if (node.type != BlockTypeConstants.metadata &&
+          node.type != BlockTypeConstants.spacer) {
         // Unfocus the title field first
         _titleFocusNode.unfocus();
         // Set the selection to the start of the first real block

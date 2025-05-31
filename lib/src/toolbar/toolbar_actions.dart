@@ -4,6 +4,7 @@ import 'package:flutter/material.dart'; // For FocusNode
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:journal_core/src/blocks/divider_block.dart' as divider;
+import '../models/block_type_constants.dart';
 
 /// Manages toolbar actions for the journal editor, including formatting and insertion.
 /// - Includes debug logs with 🔍 prefix for actions.
@@ -76,7 +77,7 @@ class ToolbarActions {
     }
   }
 
-  void _changeBlockType(Node node, BlockType type, {int? headingLevel}) {
+  void _changeBlockType(Node node, String type, {int? headingLevel}) {
     final transaction = editorState.transaction;
     final oldPath = node.path;
     final parentPath = oldPath.sublist(0, oldPath.length - 1);
@@ -89,16 +90,16 @@ class ToolbarActions {
           ],
     };
 
-    if (type == BlockType.heading) {
+    if (type == BlockTypeConstants.heading) {
       newAttributes[HeadingBlockKeys.level] = headingLevel ?? 2;
     }
 
-    if (type == BlockType.todoList) {
+    if (type == BlockTypeConstants.todoList) {
       newAttributes[TodoListBlockKeys.checked] = false;
     }
 
     final newNode = Node(
-      type: type.name,
+      type: type,
       attributes: newAttributes,
       children: [],
     );
@@ -115,10 +116,10 @@ class ToolbarActions {
     editorState.selection =
         Selection.collapsed(Position(path: newPath, offset: 0));
     // Step 5: Notify UI
-    toolbarState.setBlockType(type.name, headingLevel: headingLevel);
+    toolbarState.setBlockType(type, headingLevel: headingLevel);
 
     Log.info(
-        '🔁 Replaced node at path $oldPath with type "${type.name}" at path $newPath');
+        '🔁 Replaced node at path $oldPath with type "$type" at path $newPath');
   }
 
   void handleCycleHeading() {
@@ -134,23 +135,24 @@ class ToolbarActions {
     final currentLevel = node.attributes[HeadingBlockKeys.level] as int? ?? 2;
 
     // Step 1: If not paragraph or heading, convert to paragraph
-    if (currentType != 'paragraph' && currentType != 'heading') {
+    if (currentType != BlockTypeConstants.paragraph &&
+        currentType != BlockTypeConstants.heading) {
       Log.info(
           '🔁 Normalize block at ${node.path} to paragraph before heading cycle');
-      _changeBlockType(node, BlockType.paragraph);
+      _changeBlockType(node, BlockTypeConstants.paragraph);
     }
     // Step 2: If currently paragraph, change to heading level 2
-    else if (currentType == 'paragraph') {
+    else if (currentType == BlockTypeConstants.paragraph) {
       Log.info('🔁 Converting paragraph at ${node.path} → heading level 2');
-      _changeBlockType(node, BlockType.heading, headingLevel: 2);
+      _changeBlockType(node, BlockTypeConstants.heading, headingLevel: 2);
     }
     // Step 3: If heading, cycle to next level or back to paragraph
     else if (currentLevel == 2) {
       Log.info('🔁 Cycling heading at ${node.path} → heading level 3');
-      _changeBlockType(node, BlockType.heading, headingLevel: 3);
+      _changeBlockType(node, BlockTypeConstants.heading, headingLevel: 3);
     } else {
       Log.info('🔁 Cycling heading at ${node.path} → paragraph');
-      _changeBlockType(node, BlockType.paragraph);
+      _changeBlockType(node, BlockTypeConstants.paragraph);
     }
 
     editorState.selection = Selection.single(
@@ -174,20 +176,20 @@ class ToolbarActions {
     final hadFocus = focusNode?.hasFocus ?? false;
 
     final currentType = node.type;
-    late BlockType newType;
+    late String newType;
 
     switch (currentType) {
-      case 'bulleted_list':
-        newType = BlockType.numberedList;
+      case BlockTypeConstants.bulletedList:
+        newType = BlockTypeConstants.numberedList;
         break;
-      case 'numbered_list':
-        newType = BlockType.todoList;
+      case BlockTypeConstants.numberedList:
+        newType = BlockTypeConstants.todoList;
         break;
-      case 'todo_list':
-        newType = BlockType.paragraph;
+      case BlockTypeConstants.todoList:
+        newType = BlockTypeConstants.paragraph;
         break;
       default:
-        newType = BlockType.bulletedList;
+        newType = BlockTypeConstants.bulletedList;
     }
 
     _changeBlockType(node, newType);
@@ -208,12 +210,12 @@ class ToolbarActions {
     final node = editorState.getNodeAtPath(selection.start.path);
     if (node == null) return;
 
-    if (node.type == 'quote') {
+    if (node.type == BlockTypeConstants.quote) {
       Log.info('📝 Quote block tapped again — reverting to paragraph');
-      _changeBlockType(node, BlockType.paragraph);
+      _changeBlockType(node, BlockTypeConstants.paragraph);
     } else {
       Log.info('📝 Converting block at ${node.path} to quote');
-      _changeBlockType(node, BlockType.quote);
+      _changeBlockType(node, BlockTypeConstants.quote);
     }
 
     editorState.selection = Selection.single(
@@ -265,7 +267,7 @@ class ToolbarActions {
     transaction.insertNode(
       Path.from([index + 1]),
       Node(
-        type: 'paragraph',
+        type: BlockTypeConstants.paragraph,
         attributes: {
           'delta': [
             {'insert': ''}
@@ -296,7 +298,7 @@ class ToolbarActions {
     transaction.insertNode(
       Path.from([index]),
       Node(
-        type: 'paragraph',
+        type: BlockTypeConstants.paragraph,
         attributes: {
           'delta': [
             {'insert': ''}
@@ -428,8 +430,13 @@ class ToolbarActions {
     if (selection == null) return;
     final node = editorState.getNodeAtPath(selection.start.path);
     if (node == null) return;
-    if (!['paragraph', 'heading', 'todo_list', 'bulleted_list', 'numbered_list']
-        .contains(node.type)) {
+    if (![
+      BlockTypeConstants.paragraph,
+      BlockTypeConstants.heading,
+      'todo_list',
+      'bulleted_list',
+      'numbered_list'
+    ].contains(node.type)) {
       return;
     }
     final currentPath = selection.start.path;
@@ -488,8 +495,13 @@ class ToolbarActions {
     if (selection == null || selection.start.path.length <= 1) return;
     final node = editorState.getNodeAtPath(selection.start.path);
     if (node == null) return;
-    if (!['paragraph', 'heading', 'todo_list', 'bulleted_list', 'numbered_list']
-        .contains(node.type)) {
+    if (![
+      BlockTypeConstants.paragraph,
+      BlockTypeConstants.heading,
+      'todo_list',
+      'bulleted_list',
+      'numbered_list'
+    ].contains(node.type)) {
       return;
     }
 

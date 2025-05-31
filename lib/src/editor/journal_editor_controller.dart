@@ -3,6 +3,7 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'dart:convert';
+import '../models/block_type_constants.dart';
 
 /// Controller for the journal editor, managing editor state and toolbar interactions.
 /// - Synchronizes toolbar state with editor selection for consistent UI updates.
@@ -49,7 +50,7 @@ class JournalEditorController {
       List<int>? selectionPath = selection?.start.path;
       String? previousSiblingType;
 
-      String currentBlockType = 'paragraph';
+      String currentBlockType = BlockTypeConstants.paragraph;
       int? headingLevel;
       bool isStyleBold = false;
       bool isStyleItalic = false;
@@ -60,7 +61,7 @@ class JournalEditorController {
         final node = editorState.getNodeAtPath(selection.start.path);
         if (node != null && node.type != 'metadata_block') {
           currentBlockType = node.type;
-          if (currentBlockType == 'heading') {
+          if (currentBlockType == BlockTypeConstants.heading) {
             headingLevel = node.attributes[HeadingBlockKeys.level] as int? ?? 2;
           }
 

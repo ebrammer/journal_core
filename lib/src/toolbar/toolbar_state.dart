@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:journal_core/journal_core.dart';
+import '../models/block_type_constants.dart';
 
 class ToolbarState extends ChangeNotifier {
   bool isVisible = false;
@@ -9,7 +10,7 @@ class ToolbarState extends ChangeNotifier {
   bool isDragMode = false; // Added drag mode flag
   bool showInsertMenu = false;
   bool showLayoutMenu = false;
-  String currentBlockType = 'paragraph';
+  String currentBlockType = BlockTypeConstants.paragraph;
   int? headingLevel;
   bool isStyleBold = false;
   bool isStyleItalic = false;

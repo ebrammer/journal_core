@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
+import '../models/block_type_constants.dart';
 
 /// Configuration for a toolbar button, including icon, action, and active state.
 class ToolbarButtonConfig {
@@ -47,8 +48,8 @@ class ToolbarButtons {
         '🔧 ToolbarButtons: Current block type: ${toolbarState.currentBlockType}, isDragMode: ${toolbarState.isDragMode}');
 
     final canIndentNode = [
-      'paragraph',
-      'heading',
+      BlockTypeConstants.paragraph,
+      BlockTypeConstants.heading,
       'todo_list',
       'bulleted_list',
       'numbered_list'
@@ -78,31 +79,32 @@ class ToolbarButtons {
 
     final selection = editorState.selection;
     final currentNodeType = selection != null
-        ? editorState.getNodeAtPath(selection.start.path)?.type ?? 'paragraph'
-        : 'paragraph';
+        ? editorState.getNodeAtPath(selection.start.path)?.type ??
+            BlockTypeConstants.paragraph
+        : BlockTypeConstants.paragraph;
     Log.info('🔧 ToolbarButtons: EditorState node type: $currentNodeType');
 
     return [
       ToolbarButtonConfig(
-        key: 'heading',
+        key: BlockTypeConstants.heading,
         icon: _getHeadingIcon(),
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleCycleHeading(),
         isActive: () {
-          final active =
-              currentNodeType == 'heading' || currentNodeType == 'paragraph';
+          final active = currentNodeType == BlockTypeConstants.heading ||
+              currentNodeType == BlockTypeConstants.paragraph;
           Log.info(
               '🔘 Heading button isActive: $active for node type: $currentNodeType');
           return active;
         },
       ),
       ToolbarButtonConfig(
-        key: 'quote',
+        key: BlockTypeConstants.quote,
         icon: JournalIcons.jalignLeftSimple,
         onPressed:
             toolbarState.isDragMode ? null : () => actions.handleInsertQuote(),
         isActive: () {
-          final active = currentNodeType == 'quote';
+          final active = currentNodeType == BlockTypeConstants.quote;
           Log.info(
               '🔘 Quote button isActive: $active for node type: $currentNodeType');
           return active;
@@ -133,8 +135,12 @@ class ToolbarButtons {
           icon: JournalIcons.jtextIndent,
           onPressed: canIndent ? () => actions.handleIndent() : null,
         ),
-      if (!['todo_list', 'bulleted_list', 'numbered_list', 'quote']
-          .contains(currentNodeType))
+      if (![
+        'todo_list',
+        'bulleted_list',
+        'numbered_list',
+        BlockTypeConstants.quote
+      ].contains(currentNodeType))
         ToolbarButtonConfig(
           key: 'alignment',
           icon: _getAlignmentIcon(),
@@ -172,10 +178,11 @@ class ToolbarButtons {
         onPressed: () => actions.handleInsertBelow(),
       ),
       ToolbarButtonConfig(
-        key: 'divider',
+        key: BlockTypeConstants.divider,
         icon: JournalIcons.jminus,
         onPressed: () => actions.handleInsertDivider(),
-        isActive: () => toolbarState.currentBlockType == 'divider',
+        isActive: () =>
+            toolbarState.currentBlockType == BlockTypeConstants.divider,
       ),
     ];
   }
@@ -230,7 +237,7 @@ class ToolbarButtons {
   }
 
   IconData _getHeadingIcon() {
-    if (toolbarState.currentBlockType == 'heading') {
+    if (toolbarState.currentBlockType == BlockTypeConstants.heading) {
       return toolbarState.headingLevel == 2
           ? JournalIcons.jtextHTwo
           : JournalIcons.jtextHThree;

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import '../editor/editor_globals.dart';
+import '../models/block_type_constants.dart';
 
 /// Keys used to identify and manage prayer blocks
 class PrayerBlockKeys {
@@ -24,7 +25,7 @@ Node prayerNode({
 }) {
   final List<Node> children = [
     Node(
-      type: 'paragraph',
+      type: BlockTypeConstants.paragraph,
       attributes: {
         'delta': [
           {
@@ -40,7 +41,7 @@ Node prayerNode({
     if (line.trim().isNotEmpty) {
       children.add(
         Node(
-          type: 'paragraph',
+          type: BlockTypeConstants.paragraph,
           attributes: {
             'delta': [
               {'insert': line}

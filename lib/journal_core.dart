@@ -17,7 +17,7 @@ export 'src/blocks/metadata_block.dart';
 export 'src/models/block_model.dart';
 export 'src/models/styled_span.dart';
 export 'src/models/journal.dart';
-export 'src/models/block_type.dart';
+export 'src/models/block_type_constants.dart';
 
 // Export toolbar
 export 'src/toolbar/toolbar.dart';

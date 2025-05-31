@@ -2,6 +2,7 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart'; // Add uuid package for generating IDs
+import 'block_type_constants.dart';
 
 class Journal {
   final String id;
@@ -101,10 +102,10 @@ class Journal {
         lastModified: json['lastModified'] as int? ?? 0,
         content: Document(
           root: Node(
-            type: 'page',
+            type: BlockTypeConstants.page,
             children: [
               Node(
-                type: 'paragraph',
+                type: BlockTypeConstants.paragraph,
                 attributes: {
                   'delta': [
                     {'insert': 'Error parsing content: $e'}
@@ -123,7 +124,7 @@ class Journal {
     final uuid = Uuid();
     void addIds(Map<String, dynamic> node) {
       node['id'] ??= uuid.v4(); // Add ID if missing
-      node['type'] ??= 'paragraph'; // Ensure type is non-null
+      node['type'] ??= BlockTypeConstants.paragraph; // Ensure type is non-null
       node['attributes'] ??= {};
       if (node['children'] is List) {
         for (var child in node['children']) {

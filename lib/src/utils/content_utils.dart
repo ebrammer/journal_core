@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:appflowy_editor/appflowy_editor.dart'; // AppFlowy dependencies
 import 'package:journal_core/journal_core.dart';
+import '../models/block_type_constants.dart';
 
 /// Ensures a valid editor document is created from raw JSON input.
 /// Handles null, empty, and malformed input gracefully.
@@ -34,17 +35,12 @@ Document ensureValidEditorDocument(String? rawJson) {
 Document _defaultDocument() {
   return Document(
     root: Node(
-      type: 'page',
-      children: [
-        Node(
-          type: 'paragraph',
-          attributes: {
-            'delta': [
-              {'insert': ''}
-            ]
-          },
-        ),
-      ],
+      type: BlockTypeConstants.paragraph,
+      attributes: {
+        'delta': [
+          {'insert': ''}
+        ]
+      },
     ),
   );
 }
@@ -118,17 +114,12 @@ Document loadDocumentFromJson(String content) {
       print('Wrapping string content in document structure'); // Debug log
       return Document(
         root: Node(
-          type: 'page',
-          children: [
-            Node(
-              type: 'paragraph',
-              attributes: {
-                'delta': [
-                  {'insert': content}
-                ]
-              },
-            ),
-          ],
+          type: BlockTypeConstants.paragraph,
+          attributes: {
+            'delta': [
+              {'insert': content}
+            ]
+          },
         ),
       );
     }
@@ -137,17 +128,12 @@ Document loadDocumentFromJson(String content) {
     print('Wrapping map content in document structure'); // Debug log
     return Document(
       root: Node(
-        type: 'page',
-        children: [
-          Node(
-            type: 'paragraph',
-            attributes: {
-              'delta': [
-                {'insert': jsonEncode(json)}
-              ]
-            },
-          ),
-        ],
+        type: BlockTypeConstants.paragraph,
+        attributes: {
+          'delta': [
+            {'insert': jsonEncode(json)}
+          ]
+        },
       ),
     );
   } catch (e) {
@@ -155,17 +141,12 @@ Document loadDocumentFromJson(String content) {
     // Return a default empty document if parsing fails
     return Document(
       root: Node(
-        type: 'page',
-        children: [
-          Node(
-            type: 'paragraph',
-            attributes: {
-              'delta': [
-                {'insert': ''}
-              ]
-            },
-          ),
-        ],
+        type: BlockTypeConstants.paragraph,
+        attributes: {
+          'delta': [
+            {'insert': ''}
+          ]
+        },
       ),
     );
   }
