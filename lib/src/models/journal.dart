@@ -65,39 +65,6 @@ class Journal {
         );
       }
 
-      // Create editor state for modifications
-      final editorState = EditorState(document: document);
-
-      // Add metadata and spacer if they don't exist
-      if (document.root.children.isEmpty ||
-          document.root.children.first.type != BlockTypeConstants.metadata) {
-        final transaction = editorState.transaction;
-        transaction.insertNode(
-          [0],
-          Node(
-            type: BlockTypeConstants.metadata,
-            attributes: {
-              'created_at':
-                  json['created_at'] ?? DateTime.now().millisecondsSinceEpoch
-            },
-          ),
-        );
-        editorState.apply(transaction);
-      }
-
-      if (document.root.children.isEmpty ||
-          document.root.children.last.type != BlockTypeConstants.spacer) {
-        final transaction = editorState.transaction;
-        transaction.insertNode(
-          [document.root.children.length],
-          Node(
-            type: BlockTypeConstants.spacer,
-            attributes: {'height': 100},
-          ),
-        );
-        editorState.apply(transaction);
-      }
-
       print(
           '✅ [journal] Successfully parsed wrapped document: ${document.toJson()}');
 
