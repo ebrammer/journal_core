@@ -1,7 +1,5 @@
-// lib/src/utils/content_utils.dart
-
 import 'dart:convert';
-import 'package:appflowy_editor/appflowy_editor.dart'; // AppFlowy dependencies
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import '../models/block_type_constants.dart';
 
@@ -12,23 +10,36 @@ Document ensureValidEditorDocument(String? rawJson) {
     Log.warn('[journal_core] Null or empty content. Using blank document.');
     return _defaultDocument();
   }
+  return loadDocumentFromJson(rawJson);
+}
 
-  try {
-    final decoded = jsonDecode(rawJson);
-    if (decoded is Map<String, dynamic> && decoded.containsKey('document')) {
-      try {
-        return Document.fromJson(decoded);
-      } catch (e) {
-        Log.error('[journal_core] Failed to create document from JSON: $e');
-        return _defaultDocument();
-      }
-    }
-    Log.warn('[journal_core] JSON missing document key. Using blank document.');
-  } catch (e) {
-    Log.error('[journal_core] JSON parse failed: $e');
+/// Loads content from raw JSON string into a Document.
+/// If parsing fails, wraps the content in a paragraph block as a fallback.
+Document loadDocumentFromJson(String content) {
+  if (content.isEmpty) {
+    Log.warn('[journal_core] Empty content. Returning default document.');
+    return _defaultDocument();
   }
 
-  return _defaultDocument();
+  try {
+    final json = jsonDecode(content);
+    if (json is Map<String, dynamic> && json.containsKey('document')) {
+      final document = Document.fromJson(json);
+      Log.info(
+          '[journal_core] Successfully parsed document: ${document.toJson()}');
+      return document;
+    } else {
+      // Fallback: Wrap non-document JSON in a paragraph block
+      Log.warn(
+          '[journal_core] JSON missing document key or invalid structure. Using fallback.');
+      return _createFallbackDocument(jsonEncode(json));
+    }
+  } catch (e, stackTrace) {
+    // Fallback: Wrap raw content in a paragraph block
+    Log.error('[journal_core] Failed to parse content: $e');
+    Log.error('[journal_core] Stack trace: $stackTrace');
+    return _createFallbackDocument(content);
+  }
 }
 
 /// Creates a default empty document with a single empty paragraph.
@@ -45,109 +56,35 @@ Document _defaultDocument() {
   );
 }
 
-/// Function to load content from raw JSON string into a Document
-Document loadDocumentFromJson(String content) {
+/// Creates a fallback document by wrapping the content in a paragraph block.
+/// Used when JSON parsing fails or the structure is invalid.
+Document _createFallbackDocument(String content) {
+  String displayContent;
   try {
-    print('Raw content: $content'); // Debug log
-    final Map<String, dynamic> json = jsonDecode(content);
-    print('Parsed JSON: $json'); // Debug log
-
-    // If the content is already a document structure, use it directly
-    if (json.containsKey('document')) {
-      print('Found document key: ${json['document']}'); // Debug log
-      // Create a new document with the inner structure
-      final Map<String, dynamic> documentMap = json['document'];
-      print('Document map: $documentMap'); // Debug log
-
-      // Create the root node with all its attributes
-      final rootNode = Node(
-        type: documentMap['type'] as String,
-        attributes: Map<String, Object>.from(documentMap['data'] ?? {}),
-        children: (documentMap['children'] as List).map((child) {
-          final childMap = child as Map<String, dynamic>;
-          final childData = childMap['data'] as Map<String, dynamic>? ?? {};
-
-          // Handle delta content
-          if (childData.containsKey('delta')) {
-            return Node(
-              type: childMap['type'] as String,
-              attributes: {
-                'delta': childData['delta'],
-              },
-            );
-          }
-
-          // Handle blocks with children
-          return Node(
-            type: childMap['type'] as String,
-            attributes: Map<String, Object>.from(childData),
-            children: (childMap['children'] as List?)?.map((grandChild) {
-                  final grandChildMap = grandChild as Map<String, dynamic>;
-                  final grandChildData =
-                      grandChildMap['data'] as Map<String, dynamic>? ?? {};
-
-                  if (grandChildData.containsKey('delta')) {
-                    return Node(
-                      type: grandChildMap['type'] as String,
-                      attributes: {
-                        'delta': grandChildData['delta'],
-                      },
-                    );
-                  }
-
-                  return Node(
-                    type: grandChildMap['type'] as String,
-                    attributes: Map<String, Object>.from(grandChildData),
-                  );
-                }).toList() ??
-                [],
-          );
-        }).toList(),
-      );
-
-      print('Created root node: ${rootNode.toJson()}'); // Debug log
-      return Document(root: rootNode);
+    // Attempt to decode content to extract usable text
+    final decoded = jsonDecode(content);
+    if (decoded is String) {
+      displayContent = decoded;
+    } else if (decoded is Map || decoded is List) {
+      displayContent = jsonEncode(decoded);
+    } else {
+      displayContent = decoded.toString();
     }
-
-    // If content is a string, wrap it in a document structure
-    if (content is String) {
-      print('Wrapping string content in document structure'); // Debug log
-      return Document(
-        root: Node(
-          type: BlockTypeConstants.paragraph,
-          attributes: {
-            'delta': [
-              {'insert': content}
-            ]
-          },
-        ),
-      );
-    }
-
-    // If we have a map but no document key, wrap it in a document structure
-    print('Wrapping map content in document structure'); // Debug log
-    return Document(
-      root: Node(
-        type: BlockTypeConstants.paragraph,
-        attributes: {
-          'delta': [
-            {'insert': jsonEncode(json)}
-          ]
-        },
-      ),
-    );
-  } catch (e) {
-    print('Failed to parse content: $e');
-    // Return a default empty document if parsing fails
-    return Document(
-      root: Node(
-        type: BlockTypeConstants.paragraph,
-        attributes: {
-          'delta': [
-            {'insert': ''}
-          ]
-        },
-      ),
-    );
+  } catch (_) {
+    // If decoding fails, use raw content
+    displayContent = content;
   }
+
+  Log.info(
+      '[journal_core] Created fallback document with content: $displayContent');
+  return Document(
+    root: Node(
+      type: BlockTypeConstants.paragraph,
+      attributes: {
+        'delta': [
+          {'insert': '[Recovered Content] $displayContent'}
+        ]
+      },
+    ),
+  );
 }

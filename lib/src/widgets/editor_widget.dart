@@ -1,5 +1,3 @@
-// lib/src/widgets/editor_widget.dart
-
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
@@ -18,11 +16,13 @@ class EditorWidget extends StatefulWidget {
     required this.journal,
     required this.onSave,
     required this.onBack,
+    required this.onDelete, // Added onDelete callback
   });
 
   final Journal journal;
-  final Future Function(Journal updatedJournal) onSave;
+  final Future Function(Journal updatedJournal, String contentJson) onSave;
   final Future Function() onBack;
+  final Future Function(String journalId) onDelete; // New callback
 
   @override
   State<EditorWidget> createState() => _EditorWidgetState();
@@ -38,13 +38,12 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   late TextEditingController titleController;
   late FocusNode _titleFocusNode;
-  String _currentTitle = "";
+  late String _currentTitle;
   bool _showCollapsedTitle = false;
 
   final GlobalKey<ReorderableEditorState> _reorderableKey =
       GlobalKey<ReorderableEditorState>();
 
-  // Add a flag to track if a move is in progress
   bool _isMovingBlock = false;
 
   @override
@@ -59,20 +58,21 @@ class _EditorWidgetState extends State<EditorWidget> {
     Log.info('Initializing editor state with content...');
     final document = widget.journal.content;
     _editorState = EditorState(document: document);
-    EditorGlobals.editorState = _editorState; // Set the global editor state
+    EditorGlobals.editorState = _editorState;
 
     final transaction = _editorState.transaction;
-    // Insert metadata_block at the top instead of spacer_block
+    final validCreatedAt = widget.journal.createdAt > 0
+        ? widget.journal.createdAt
+        : DateTime.now().millisecondsSinceEpoch;
     if (document.root.children.isEmpty ||
         document.root.children.first.type != BlockTypeConstants.metadata) {
       transaction.insertNode(
           [0],
           Node(
             type: BlockTypeConstants.metadata,
-            attributes: {'created_at': widget.journal.createdAt},
+            attributes: {'created_at': validCreatedAt},
           ));
     }
-    // Keep bottom spacer_block
     if (document.root.children.isEmpty ||
         document.root.children.last.type != BlockTypeConstants.spacer) {
       transaction.insertNode(
@@ -87,8 +87,9 @@ class _EditorWidgetState extends State<EditorWidget> {
       _editorState.apply(transaction);
       Log.info(
           'Created document with metadata_block and spacer: ${document.toJson()}');
-    } catch (e, s) {
-      Log.error('[EditorWidget.initState] Failed to apply transaction: $e\n$s');
+    } catch (e, stackTrace) {
+      Log.error(
+          '[EditorWidget.initState] Failed to apply transaction: $e\n$stackTrace');
     }
 
     _focusNode = FocusNode();
@@ -97,11 +98,10 @@ class _EditorWidgetState extends State<EditorWidget> {
       editorState: _editorState,
       toolbarState: _toolbarState,
     );
+    _controller.ensureValidSelection();
     _editorState.selectionNotifier.addListener(_onSelectionChanged);
-
     _titleFocusNode.addListener(() {
       if (_titleFocusNode.hasFocus) {
-        // Don't unfocus the editor's focus node, just clear its selection
         _editorState.selection = null;
       }
     });
@@ -109,16 +109,13 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   void _updateSelectedBlockPath() {
     if (_isMovingBlock) {
-      // Skip updating during a move to prevent jank
       return;
     }
     final selection = _editorState.selection;
     if (selection != null && selection.start.path.isNotEmpty) {
       final documentIndex = selection.start.path[0];
       if (documentIndex > 0) {
-        // Adjust for metadata block
         final visualIndex = documentIndex - 1;
-        // Only update if significantly different to avoid jank during transactions
         if (_selectedBlockPath == null ||
             _selectedBlockPath!.join() != [visualIndex].join()) {
           setState(() {
@@ -135,7 +132,6 @@ class _EditorWidgetState extends State<EditorWidget> {
       _selectedBlockPath = path;
       _showDeleteFab = true;
     });
-    // Ensure a valid selection exists to keep toolbar visible
     if (_editorState.selection == null) {
       _editorState.selection = Selection.collapsed(
         Position(path: path, offset: 0),
@@ -199,17 +195,17 @@ class _EditorWidgetState extends State<EditorWidget> {
                     IconButton(
                       icon: const Icon(JournalIcons.jarrowLeft, size: 24),
                       onPressed: () async {
-                        // Save before navigating
                         final content = _controller.getDocumentContent();
-                        await widget.onSave(Journal(
+                        final updatedJournal = Journal(
                           id: widget.journal.id,
                           title: _currentTitle,
                           createdAt: widget.journal.createdAt,
                           lastModified: DateTime.now().millisecondsSinceEpoch,
                           content: _editorState.document,
-                        ));
-
-                        // Call the onBack callback
+                        );
+                        Log.info(
+                            '🔍 Saving journal on back: ${updatedJournal.toJson()}');
+                        await widget.onSave(updatedJournal, content);
                         await widget.onBack();
                       },
                       color: Theme.of(context).iconTheme.color,
@@ -257,18 +253,12 @@ class _EditorWidgetState extends State<EditorWidget> {
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop(); // Close dialog
-                                    Navigator.of(context)
-                                        .pop(); // Go back to previous page
-                                    widget.onSave(Journal(
-                                      id: widget.journal.id,
-                                      title: _currentTitle,
-                                      createdAt: widget.journal.createdAt,
-                                      lastModified:
-                                          DateTime.now().millisecondsSinceEpoch,
-                                      content: _editorState.document,
-                                    ));
+                                  onPressed: () async {
+                                    Navigator.of(context).pop();
+                                    Navigator.of(context).pop();
+                                    Log.info(
+                                        '🔍 Deleting journal ID: ${widget.journal.id}');
+                                    await widget.onDelete(widget.journal.id);
                                   },
                                   style: TextButton.styleFrom(
                                     foregroundColor: Colors.red,
@@ -292,20 +282,16 @@ class _EditorWidgetState extends State<EditorWidget> {
                     TextButton(
                       onPressed: () async {
                         final content = _controller.getDocumentContent();
-                        await widget.onSave(Journal(
+                        final updatedJournal = Journal(
                           id: widget.journal.id,
                           title: _currentTitle,
                           createdAt: widget.journal.createdAt,
                           lastModified: DateTime.now().millisecondsSinceEpoch,
                           content: _editorState.document,
-                        ));
-                        Log.info('🔍 Saved journal: ${Journal(
-                          id: widget.journal.id,
-                          title: _currentTitle,
-                          createdAt: widget.journal.createdAt,
-                          lastModified: DateTime.now().millisecondsSinceEpoch,
-                          content: _editorState.document,
-                        ).toJson()}');
+                        );
+                        Log.info(
+                            '🔍 Saving journal: ${updatedJournal.toJson()}');
+                        await widget.onSave(updatedJournal, content);
                       },
                       style: TextButton.styleFrom(
                         backgroundColor: theme.primaryText,
@@ -341,10 +327,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                     child: Consumer<ToolbarState>(
                       builder: (context, toolbarState, _) {
                         if (toolbarState.isDragMode) {
-                          // Hide the keyboard when entering reorder mode
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             unfocusAndHideKeyboard(context);
-                            // Ensure a valid selection exists to keep toolbar visible
                             if (_editorState.selection == null &&
                                 _selectedBlockPath != null) {
                               _editorState.selection = Selection.collapsed(
@@ -442,6 +426,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                     editorState: _editorState,
                     controller: _controller,
                     onSave: () async {
+                      final content = _controller.getDocumentContent();
                       final updatedJournal = Journal(
                         id: widget.journal.id,
                         title: _currentTitle,
@@ -449,8 +434,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                         lastModified: DateTime.now().millisecondsSinceEpoch,
                         content: _editorState.document,
                       );
-                      await widget.onSave(updatedJournal);
-                      Log.info('🔍 Saved journal: ${updatedJournal.toJson()}');
+                      Log.info(
+                          '🔍 Saving journal from toolbar: ${updatedJournal.toJson()}');
+                      await widget.onSave(updatedJournal, content);
                     },
                     focusNode: _focusNode,
                     onDocumentChanged: () => _onDocumentChanged(),
@@ -471,7 +457,6 @@ class _EditorWidgetState extends State<EditorWidget> {
                   ),
                 ],
               ),
-              // Floating delete button for selected divider
               if (_editorState.selection != null && _showDeleteFab)
                 Consumer<ToolbarState>(
                   builder: (context, toolbarState, _) {
@@ -482,7 +467,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                         .getNodeAtPath(_editorState.selection!.start.path);
                     if (selectedNode?.type == divider.DividerBlockKeys.type) {
                       return Positioned(
-                        bottom: 56, // Position above the toolbar
+                        bottom: 56,
                         left: 0,
                         right: 0,
                         child: Center(
@@ -544,12 +529,9 @@ class _EditorWidgetState extends State<EditorWidget> {
       final node = children[i];
       if (node.type != BlockTypeConstants.metadata &&
           node.type != BlockTypeConstants.spacer) {
-        // Unfocus the title field first
         _titleFocusNode.unfocus();
-        // Set the selection to the start of the first real block
         _editorState.selection =
             Selection.collapsed(Position(path: [i], offset: 0));
-        // Request focus for the editor
         _focusNode.requestFocus();
         break;
       }
@@ -563,9 +545,9 @@ class _EditorWidgetState extends State<EditorWidget> {
       _editorState.apply(transaction);
       _editorState.selection = null;
       _onDocumentChanged();
-    } catch (e, s) {
+    } catch (e, stackTrace) {
       Log.error(
-          '[EditorWidget._deleteDivider] Failed to delete divider: $e\n$s');
+          '[EditorWidget._deleteDivider] Failed to delete divider: $e\n$stackTrace');
     }
   }
 }
