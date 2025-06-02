@@ -444,6 +444,31 @@ class _EditorWidgetState extends State<EditorWidget> {
                                       _focusFirstRealBlock(),
                                   readOnly: false,
                                 ),
+                                'date': MetadataBlockBuilder(
+                                  titleController:
+                                      TextEditingController(text: 'Date'),
+                                  createdAt: widget.journal.createdAt,
+                                  onTitleChanged: (_) {},
+                                  titleFocusNode: FocusNode(),
+                                  onTitleEditingComplete: () {},
+                                  onTitleSubmitted: (_) {},
+                                  readOnly: true,
+                                ),
+                                'title': MetadataBlockBuilder(
+                                  titleController: TextEditingController(
+                                      text: widget.journal.title),
+                                  createdAt: widget.journal.createdAt,
+                                  onTitleChanged: (value) {
+                                    setState(() {
+                                      _currentTitle = value;
+                                    });
+                                  },
+                                  titleFocusNode: _titleFocusNode,
+                                  onTitleEditingComplete: _focusFirstRealBlock,
+                                  onTitleSubmitted: (_) =>
+                                      _focusFirstRealBlock(),
+                                  readOnly: false,
+                                ),
                                 divider.DividerBlockKeys.type:
                                     divider.DividerBlockComponentBuilder(),
                               },

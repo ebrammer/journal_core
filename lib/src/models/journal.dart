@@ -39,6 +39,10 @@ class Journal {
 
       if (contentJson is String) {
         try {
+          if (contentJson.isEmpty) {
+            print('⚠️ [journal] Content string is empty');
+            return Journal.blank();
+          }
           final Map<String, dynamic> parsedJson = jsonDecode(contentJson);
           document = Document.fromJson(parsedJson);
         } catch (e) {
@@ -47,6 +51,10 @@ class Journal {
         }
       } else if (contentJson is Map<String, dynamic>) {
         try {
+          if (contentJson.isEmpty) {
+            print('⚠️ [journal] Content map is empty');
+            return Journal.blank();
+          }
           document = Document.fromJson(contentJson);
         } catch (e) {
           print('❌ [journal] Failed to parse content JSON map: $e');
