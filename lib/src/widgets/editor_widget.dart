@@ -67,6 +67,10 @@ class _EditorWidgetState extends State<EditorWidget> {
         _editorState.selection = null;
       }
     });
+    // Add a listener to check for updated journal content after initial load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdatedContent();
+    });
   }
 
   void _initEditorState() {
@@ -624,6 +628,50 @@ class _EditorWidgetState extends State<EditorWidget> {
     } catch (e, stackTrace) {
       Log.error(
           '[EditorWidget._deleteDivider] Failed to delete divider: $e\n$stackTrace');
+    }
+  }
+
+  // Add a method to check for updated content after initial load
+  void _checkForUpdatedContent() {
+    if (widget.journal.content != _editorState.document) {
+      print(
+          '🔄 [editor_widget] Detected updated content after initial load, reinitializing editor state');
+      setState(() {
+        _editorState = EditorState(document: widget.journal.content);
+        final transaction = _editorState.transaction;
+        final validCreatedAt = widget.journal.createdAt > 0
+            ? widget.journal.createdAt
+            : DateTime.now().millisecondsSinceEpoch;
+        if (_editorState.document.root.children.isEmpty ||
+            _editorState.document.root.children.first.type !=
+                BlockTypeConstants.metadata) {
+          transaction.insertNode(
+            [0],
+            Node(
+              type: BlockTypeConstants.metadata,
+              attributes: {'created_at': validCreatedAt},
+            ),
+          );
+          print(
+              '📌 [editor_widget] Added metadata block during reinitialization');
+        }
+        if (_editorState.document.root.children.isEmpty ||
+            _editorState.document.root.children.last.type !=
+                BlockTypeConstants.spacer) {
+          transaction.insertNode(
+            [_editorState.document.root.children.length],
+            Node(
+              type: BlockTypeConstants.spacer,
+              attributes: {'height': 100},
+            ),
+          );
+          print(
+              '📌 [editor_widget] Added spacer block during reinitialization');
+        }
+        _editorState.apply(transaction);
+        print(
+            '✅ [editor_widget] Editor state reinitialized with updated content');
+      });
     }
   }
 }

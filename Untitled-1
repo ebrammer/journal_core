@@ -1,0 +1,57 @@
+// Automatic FlutterFlow imports
+import '/backend/schema/structs/index.dart';
+import '/backend/schema/enums/enums.dart';
+import '/backend/supabase/supabase.dart';
+import '/backend/sqlite/sqlite_manager.dart';
+import '/actions/actions.dart' as action_blocks;
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import 'index.dart'; // Imports other custom widgets
+import '/custom_code/actions/index.dart'; // Imports custom actions
+import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+import 'package:flutter/material.dart';
+// Begin custom widget code
+// DO NOT REMOVE OR MODIFY THE CODE ABOVE!
+
+// editor_wrapper.dart
+//
+
+// editor_wrapper.dart
+import 'package:journal_core/src/widgets/editor_widget.dart';
+import 'package:journal_core/src/models/journal.dart';
+
+/// editor_wrapper.dart
+class EditorWrapper extends StatefulWidget {
+  const EditorWrapper({
+    super.key,
+    this.width,
+    this.height,
+    required this.onSave,
+    required this.onBack,
+    required this.journal,
+  });
+
+  final double? width;
+  final double? height;
+  final Future Function(Journal updatedJournal) onSave;
+  final Future Function() onBack;
+  final Journal journal;
+
+  @override
+  State<EditorWrapper> createState() => _EditorWrapperState();
+}
+
+class _EditorWrapperState extends State<EditorWrapper> {
+  @override
+  Widget build(BuildContext context) {
+    return EditorWidget(
+      journal: widget.journal,
+      onSave: widget.onSave,
+      onBack: widget.onBack,
+      onDelete: (journalId) async {
+        // Dummy function to satisfy the required callback
+        print('Delete functionality not implemented in EditorWrapper');
+      },
+    );
+  }
+} 
