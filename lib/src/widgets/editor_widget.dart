@@ -49,7 +49,24 @@ class _EditorWidgetState extends State<EditorWidget> {
   @override
   void initState() {
     super.initState();
+    _currentTitle = widget.journal.title;
+    titleController = TextEditingController(text: _currentTitle);
+    _titleFocusNode = FocusNode();
+    _focusNode = FocusNode();
+    _selectedBlockPath = null;
+    _toolbarState = ToolbarState();
     _initEditorState();
+    _controller = JournalEditorController(
+      editorState: _editorState,
+      toolbarState: _toolbarState,
+    );
+    _controller.ensureValidSelection();
+    _editorState.selectionNotifier.addListener(_onSelectionChanged);
+    _titleFocusNode.addListener(() {
+      if (_titleFocusNode.hasFocus) {
+        _editorState.selection = null;
+      }
+    });
   }
 
   void _initEditorState() {
