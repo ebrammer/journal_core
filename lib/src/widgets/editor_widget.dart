@@ -89,9 +89,45 @@ class _EditorWidgetState extends State<EditorWidget> {
         _editorState = EditorState(document: document);
       }
 
-      print('✅ [editor_widget] Editor state initialized successfully');
-      print(
-          '📊 [editor_widget] Final document structure: ${_editorState.document.toJson()}');
+      // Add metadata and spacer blocks if they don't exist
+      final transaction = _editorState.transaction;
+      final validCreatedAt = widget.journal.createdAt > 0
+          ? widget.journal.createdAt
+          : DateTime.now().millisecondsSinceEpoch;
+
+      // Only add metadata and spacer if they don't exist
+      if (_editorState.document.root.children.isEmpty ||
+          _editorState.document.root.children.first.type !=
+              BlockTypeConstants.metadata) {
+        transaction.insertNode(
+          [0],
+          Node(
+            type: BlockTypeConstants.metadata,
+            attributes: {'created_at': validCreatedAt},
+          ),
+        );
+      }
+      if (_editorState.document.root.children.isEmpty ||
+          _editorState.document.root.children.last.type !=
+              BlockTypeConstants.spacer) {
+        transaction.insertNode(
+          [_editorState.document.root.children.length],
+          Node(
+            type: BlockTypeConstants.spacer,
+            attributes: {'height': 100},
+          ),
+        );
+      }
+
+      try {
+        _editorState.apply(transaction);
+        print('✅ [editor_widget] Editor state initialized successfully');
+        print(
+            '📊 [editor_widget] Final document structure: ${_editorState.document.toJson()}');
+      } catch (e, stackTrace) {
+        print('❌ [editor_widget] Failed to apply transaction: $e');
+        print('📚 [editor_widget] Stack trace: $stackTrace');
+      }
     } catch (e, stackTrace) {
       print('❌ [editor_widget] Error initializing editor state: $e');
       print('📚 [editor_widget] Stack trace: $stackTrace');
@@ -289,7 +325,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                           content: _editorState.document,
                         );
                         Log.info(
-                            '🔍 Saving journal: ${updatedJournal.toJson()}');
+                            '�� Saving journal: ${updatedJournal.toJson()}');
                         await widget.onSave(updatedJournal, content);
                       },
                       style: TextButton.styleFrom(
