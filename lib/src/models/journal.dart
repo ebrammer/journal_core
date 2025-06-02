@@ -20,121 +20,119 @@ class Journal {
     required this.content,
   });
 
-  Map<String, dynamic> toJson() {
-    final documentJson = content.toJson();
-    // Ensure all nodes have an ID
-    final documentWithIds = _addIdsToNodes({'document': documentJson});
-    return {
-      'id': id,
-      'title': title,
-      'createdAt': createdAt,
-      'lastModified': lastModified,
-      'content': jsonEncode(documentWithIds),
-    };
-  }
-
   factory Journal.fromJson(Map<String, dynamic> json) {
     try {
-      if (!json.containsKey('content') || json['content'] == null) {
-        Log.warn('[journal_core] Missing or null content field: $json');
-        return Journal(
-          id: json['id'] as String? ?? '',
-          title: json['title'] as String? ?? '',
-          createdAt: json['createdAt'] as int? ?? 0,
-          lastModified: json['lastModified'] as int? ?? 0,
-          content: Document.blank(),
-        );
+      print('🔍 [journal] Parsing JSON: $json');
+
+      // Validate content field
+      if (!json.containsKey('content')) {
+        print('⚠️ [journal] No content field found in JSON');
+        return Journal.blank();
       }
 
-      final contentJson = json['content'] as String;
-      if (contentJson.isEmpty) {
-        Log.warn('[journal_core] Content is empty');
-        return Journal(
-          id: json['id'] as String? ?? '',
-          title: json['title'] as String? ?? '',
-          createdAt: json['createdAt'] as int? ?? 0,
-          lastModified: json['lastModified'] as int? ?? 0,
-          content: Document.blank(),
-        );
-      }
+      // Parse content JSON
+      final contentJson = json['content'];
+      Document document;
 
-      Log.info('[journal_core] Parsing content JSON: $contentJson');
-      final decoded = jsonDecode(contentJson);
-      if (decoded is! Map<String, dynamic>) {
-        Log.error(
-            '[journal_core] Content is not a valid JSON object: $decoded');
-        throw FormatException('Content is not a valid JSON object');
-      }
-
-      // Ensure the document has the correct structure
-      Map<String, dynamic> documentWithIds;
-      if (decoded.containsKey('document')) {
-        final doc = decoded['document'] as Map<String, dynamic>;
-        Log.info('[journal_core] Found document structure: $doc');
-
-        // Ensure the document has a page type root
-        if (!doc.containsKey('type') || doc['type'] != 'page') {
-          Log.warn(
-              '[journal_core] Document root type is not page, fixing structure');
-          doc['type'] = 'page';
+      if (contentJson is String) {
+        try {
+          final Map<String, dynamic> parsedJson = jsonDecode(contentJson);
+          document = Document.fromJson(parsedJson);
+        } catch (e) {
+          print('❌ [journal] Failed to parse content JSON string: $e');
+          return Journal.blank();
         }
-        documentWithIds = _addIdsToNodes(decoded);
+      } else if (contentJson is Map<String, dynamic>) {
+        try {
+          document = Document.fromJson(contentJson);
+        } catch (e) {
+          print('❌ [journal] Failed to parse content JSON map: $e');
+          return Journal.blank();
+        }
       } else {
-        Log.warn('[journal_core] Document structure missing, wrapping content');
-        documentWithIds = _addIdsToNodes({
-          'document': {
-            'type': 'page',
-            'children': decoded['children'] ?? [],
-          }
-        });
+        print('❌ [journal] Invalid content type: ${contentJson.runtimeType}');
+        return Journal.blank();
       }
 
-      Log.info(
-          '[journal_core] Document structure before parsing: $documentWithIds');
-      final document = Document.fromJson(documentWithIds);
-      Log.info('[journal_core] Document after parsing: ${document.toJson()}');
+      // Ensure document has correct structure
+      if (document.root.type != BlockTypeConstants.page) {
+        print('⚠️ [journal] Root type is not page, fixing structure');
+        document = Document(
+          root: Node(
+            type: BlockTypeConstants.page,
+            children: document.root.children,
+          ),
+        );
+      }
+
+      // Create editor state for modifications
+      final editorState = EditorState(document: document);
+
+      // Add metadata and spacer if they don't exist
+      if (document.root.children.isEmpty ||
+          document.root.children.first.type != BlockTypeConstants.metadata) {
+        final transaction = editorState.transaction;
+        transaction.insertNode(
+          [0],
+          Node(
+            type: BlockTypeConstants.metadata,
+            attributes: {
+              'created_at':
+                  json['created_at'] ?? DateTime.now().millisecondsSinceEpoch
+            },
+          ),
+        );
+        editorState.apply(transaction);
+      }
+
+      if (document.root.children.isEmpty ||
+          document.root.children.last.type != BlockTypeConstants.spacer) {
+        final transaction = editorState.transaction;
+        transaction.insertNode(
+          [document.root.children.length],
+          Node(
+            type: BlockTypeConstants.spacer,
+            attributes: {'height': 100},
+          ),
+        );
+        editorState.apply(transaction);
+      }
+
+      print(
+          '✅ [journal] Successfully parsed wrapped document: ${document.toJson()}');
 
       return Journal(
-        id: json['id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        createdAt: json['createdAt'] as int? ?? 0,
-        lastModified: json['lastModified'] as int? ?? 0,
+        id: json['id'] ?? '',
+        title: json['title'] ?? '',
+        createdAt: json['created_at'] ?? DateTime.now().millisecondsSinceEpoch,
+        lastModified:
+            json['last_modified'] ?? DateTime.now().millisecondsSinceEpoch,
         content: document,
       );
     } catch (e, stackTrace) {
-      Log.error('[journal_core] Failed to parse Journal: $e');
-      Log.error('[journal_core] Stack trace: $stackTrace');
-      Log.error('[journal_core] Input JSON: $json');
-      return Journal(
-        id: json['id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        createdAt: json['createdAt'] as int? ?? 0,
-        lastModified: json['lastModified'] as int? ?? 0,
-        content: Document.blank(),
-      );
+      print('❌ [journal] Error parsing journal: $e');
+      print('📚 [journal] Stack trace: $stackTrace');
+      return Journal.blank();
     }
   }
 
-  // Helper method to add IDs to nodes
-  static Map<String, dynamic> _addIdsToNodes(Map<String, dynamic> json) {
-    final uuid = Uuid();
-    void addIds(Map<String, dynamic> node) {
-      node['id'] ??= uuid.v4(); // Add ID if missing
-      node['type'] ??= BlockTypeConstants.paragraph; // Ensure type is non-null
-      node['attributes'] ??= {};
-      if (node['children'] is List) {
-        for (var child in node['children']) {
-          if (child is Map<String, dynamic>) {
-            addIds(child);
-          }
-        }
-      }
-    }
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'created_at': createdAt,
+      'last_modified': lastModified,
+      'content': content.toJson(),
+    };
+  }
 
-    final document = json['document'] as Map<String, dynamic>? ?? {};
-    if (document.containsKey('root')) {
-      addIds(document['root'] as Map<String, dynamic>);
-    }
-    return json;
+  factory Journal.blank() {
+    return Journal(
+      id: '',
+      title: '',
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      lastModified: DateTime.now().millisecondsSinceEpoch,
+      content: Document.blank(),
+    );
   }
 }
