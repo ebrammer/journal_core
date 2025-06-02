@@ -23,19 +23,26 @@ Document loadDocumentFromJson(String content) {
 
   try {
     final json = jsonDecode(content);
-    if (json is Map<String, dynamic> && json.containsKey('document')) {
-      final document = Document.fromJson(json);
-      Log.info(
-          '[journal_core] Successfully parsed document: ${document.toJson()}');
-      return document;
-    } else {
-      // Fallback: Wrap non-document JSON in a paragraph block
-      Log.warn(
-          '[journal_core] JSON missing document key or invalid structure. Using fallback.');
-      return _createFallbackDocument(jsonEncode(json));
+    // Handle both direct document structure and wrapped document structure
+    if (json is Map<String, dynamic>) {
+      if (json.containsKey('document')) {
+        final document = Document.fromJson(json);
+        Log.info(
+            '[journal_core] Successfully parsed document: ${document.toJson()}');
+        return document;
+      } else if (json.containsKey('type') && json.containsKey('children')) {
+        // Handle direct document structure
+        final document = Document.fromJson({'document': json});
+        Log.info(
+            '[journal_core] Successfully parsed direct document structure: ${document.toJson()}');
+        return document;
+      }
     }
+
+    // If we get here, the structure is not what we expect
+    Log.warn('[journal_core] JSON structure not recognized. Using fallback.');
+    return _createFallbackDocument(jsonEncode(json));
   } catch (e, stackTrace) {
-    // Fallback: Wrap raw content in a paragraph block
     Log.error('[journal_core] Failed to parse content: $e');
     Log.error('[journal_core] Stack trace: $stackTrace');
     return _createFallbackDocument(content);
