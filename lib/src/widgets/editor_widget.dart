@@ -60,7 +60,21 @@ class _EditorWidgetState extends State<EditorWidget> {
     Log.info(
         '[journal_core] Document structure in editor: ${document.toJson()}');
 
-    _editorState = EditorState(document: document);
+    // Ensure the document has a valid root structure
+    if (document.root.type != BlockTypeConstants.page) {
+      Log.warn(
+          '[journal_core] Document root type is not page, fixing structure');
+      final fixedDocument = Document(
+        root: Node(
+          type: BlockTypeConstants.page,
+          children: document.root.children,
+        ),
+      );
+      _editorState = EditorState(document: fixedDocument);
+    } else {
+      _editorState = EditorState(document: document);
+    }
+
     EditorGlobals.editorState = _editorState;
 
     final transaction = _editorState.transaction;
@@ -69,8 +83,9 @@ class _EditorWidgetState extends State<EditorWidget> {
         : DateTime.now().millisecondsSinceEpoch;
 
     // Only add metadata and spacer if they don't exist
-    if (document.root.children.isEmpty ||
-        document.root.children.first.type != BlockTypeConstants.metadata) {
+    if (_editorState.document.root.children.isEmpty ||
+        _editorState.document.root.children.first.type !=
+            BlockTypeConstants.metadata) {
       transaction.insertNode(
           [0],
           Node(
@@ -78,10 +93,11 @@ class _EditorWidgetState extends State<EditorWidget> {
             attributes: {'created_at': validCreatedAt},
           ));
     }
-    if (document.root.children.isEmpty ||
-        document.root.children.last.type != BlockTypeConstants.spacer) {
+    if (_editorState.document.root.children.isEmpty ||
+        _editorState.document.root.children.last.type !=
+            BlockTypeConstants.spacer) {
       transaction.insertNode(
-          [document.root.children.length],
+          [_editorState.document.root.children.length],
           Node(
             type: BlockTypeConstants.spacer,
             attributes: {'height': 100},
@@ -91,7 +107,10 @@ class _EditorWidgetState extends State<EditorWidget> {
     try {
       _editorState.apply(transaction);
       Log.info(
-          '[journal_core] Document after applying transaction: ${document.toJson()}');
+          '[journal_core] Document after applying transaction: ${_editorState.document.toJson()}');
+
+      // Set initial selection to the first content block
+      _focusFirstRealBlock();
     } catch (e, stackTrace) {
       Log.error('[journal_core] Failed to apply transaction: $e\n$stackTrace');
     }
@@ -534,9 +553,9 @@ class _EditorWidgetState extends State<EditorWidget> {
       if (node.type != BlockTypeConstants.metadata &&
           node.type != BlockTypeConstants.spacer) {
         _titleFocusNode.unfocus();
-        _editorState.selection =
-            Selection.collapsed(Position(path: [i], offset: 0));
-        _focusNode.requestFocus();
+        _editorState.selection = Selection.collapsed(
+          Position(path: [i], offset: 0),
+        );
         break;
       }
     }
