@@ -36,27 +36,57 @@ class Journal {
   factory Journal.fromJson(Map<String, dynamic> json) {
     try {
       if (!json.containsKey('content') || json['content'] == null) {
-        throw FormatException('Missing or null content field: $json');
+        Log.warn('[journal_core] Missing or null content field: $json');
+        return Journal(
+          id: json['id'] as String? ?? '',
+          title: json['title'] as String? ?? '',
+          createdAt: json['createdAt'] as int? ?? 0,
+          lastModified: json['lastModified'] as int? ?? 0,
+          content: Document.blank(),
+        );
       }
 
       final contentJson = json['content'] as String;
       if (contentJson.isEmpty) {
-        throw FormatException('Content is empty');
+        Log.warn('[journal_core] Content is empty');
+        return Journal(
+          id: json['id'] as String? ?? '',
+          title: json['title'] as String? ?? '',
+          createdAt: json['createdAt'] as int? ?? 0,
+          lastModified: json['lastModified'] as int? ?? 0,
+          content: Document.blank(),
+        );
       }
 
-      // Parse the content JSON
+      Log.info('[journal_core] Parsing content JSON: $contentJson');
       final decoded = jsonDecode(contentJson);
       if (decoded is! Map<String, dynamic>) {
+        Log.error(
+            '[journal_core] Content is not a valid JSON object: $decoded');
         throw FormatException('Content is not a valid JSON object');
       }
 
       // Ensure the document has the correct structure
       Map<String, dynamic> documentWithIds;
       if (decoded.containsKey('document')) {
+        final doc = decoded['document'] as Map<String, dynamic>;
+        Log.info('[journal_core] Found document structure: $doc');
+
+        // Ensure the document has a page type root
+        if (!doc.containsKey('type') || doc['type'] != 'page') {
+          Log.warn(
+              '[journal_core] Document root type is not page, fixing structure');
+          doc['type'] = 'page';
+        }
         documentWithIds = _addIdsToNodes(decoded);
       } else {
-        // If the document is not wrapped, wrap it
-        documentWithIds = _addIdsToNodes({'document': decoded});
+        Log.warn('[journal_core] Document structure missing, wrapping content');
+        documentWithIds = _addIdsToNodes({
+          'document': {
+            'type': 'page',
+            'children': decoded['children'] ?? [],
+          }
+        });
       }
 
       Log.info(
@@ -80,21 +110,7 @@ class Journal {
         title: json['title'] as String? ?? '',
         createdAt: json['createdAt'] as int? ?? 0,
         lastModified: json['lastModified'] as int? ?? 0,
-        content: Document(
-          root: Node(
-            type: BlockTypeConstants.page,
-            children: [
-              Node(
-                type: BlockTypeConstants.paragraph,
-                attributes: {
-                  'delta': [
-                    {'insert': 'Error parsing content: $e'}
-                  ]
-                },
-              ),
-            ],
-          ),
-        ),
+        content: Document.blank(),
       );
     }
   }

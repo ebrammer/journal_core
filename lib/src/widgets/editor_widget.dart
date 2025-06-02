@@ -49,85 +49,37 @@ class _EditorWidgetState extends State<EditorWidget> {
   @override
   void initState() {
     super.initState();
+    _initEditorState();
+  }
 
-    _currentTitle = widget.journal.title;
-    titleController = TextEditingController(text: _currentTitle);
-    _titleFocusNode = FocusNode();
-    _selectedBlockPath = null;
-
-    Log.info('Initializing editor state with content...');
-    final document = widget.journal.content;
-    Log.info(
-        '[journal_core] Document structure in editor: ${document.toJson()}');
-
-    // Ensure the document has a valid root structure
-    if (document.root.type != BlockTypeConstants.page) {
-      Log.warn(
-          '[journal_core] Document root type is not page, fixing structure');
-      final fixedDocument = Document(
-        root: Node(
-          type: BlockTypeConstants.page,
-          children: document.root.children,
-        ),
-      );
-      _editorState = EditorState(document: fixedDocument);
-    } else {
-      _editorState = EditorState(document: document);
-    }
-
-    EditorGlobals.editorState = _editorState;
-
-    final transaction = _editorState.transaction;
-    final validCreatedAt = widget.journal.createdAt > 0
-        ? widget.journal.createdAt
-        : DateTime.now().millisecondsSinceEpoch;
-
-    // Only add metadata and spacer if they don't exist
-    if (_editorState.document.root.children.isEmpty ||
-        _editorState.document.root.children.first.type !=
-            BlockTypeConstants.metadata) {
-      transaction.insertNode(
-          [0],
-          Node(
-            type: BlockTypeConstants.metadata,
-            attributes: {'created_at': validCreatedAt},
-          ));
-    }
-    if (_editorState.document.root.children.isEmpty ||
-        _editorState.document.root.children.last.type !=
-            BlockTypeConstants.spacer) {
-      transaction.insertNode(
-          [_editorState.document.root.children.length],
-          Node(
-            type: BlockTypeConstants.spacer,
-            attributes: {'height': 100},
-          ));
-    }
-
+  void _initEditorState() {
     try {
-      _editorState.apply(transaction);
-      Log.info(
-          '[journal_core] Document after applying transaction: ${_editorState.document.toJson()}');
+      final document = widget.journal.content;
+      print('🔍 [editor_widget] Initializing editor with document');
+      print('📄 [editor_widget] Document structure: ${document.toJson()}');
 
-      // Set initial selection to the first content block
-      _focusFirstRealBlock();
-    } catch (e, stackTrace) {
-      Log.error('[journal_core] Failed to apply transaction: $e\n$stackTrace');
-    }
-
-    _focusNode = FocusNode();
-    _toolbarState = ToolbarState();
-    _controller = JournalEditorController(
-      editorState: _editorState,
-      toolbarState: _toolbarState,
-    );
-    _controller.ensureValidSelection();
-    _editorState.selectionNotifier.addListener(_onSelectionChanged);
-    _titleFocusNode.addListener(() {
-      if (_titleFocusNode.hasFocus) {
-        _editorState.selection = null;
+      // Ensure the document has a valid root structure
+      if (document.root.type != BlockTypeConstants.page) {
+        print('⚠️ [editor_widget] Root type is not page, fixing structure');
+        final fixedDocument = Document(
+          root: Node(
+            type: BlockTypeConstants.page,
+            children: document.root.children,
+          ),
+        );
+        _editorState = EditorState(document: fixedDocument);
+      } else {
+        _editorState = EditorState(document: document);
       }
-    });
+
+      print('✅ [editor_widget] Editor state initialized successfully');
+      print(
+          '📊 [editor_widget] Final document structure: ${_editorState.document.toJson()}');
+    } catch (e, stackTrace) {
+      print('❌ [editor_widget] Error initializing editor state: $e');
+      print('📚 [editor_widget] Stack trace: $stackTrace');
+      _editorState = EditorState(document: Document.blank());
+    }
   }
 
   void _updateSelectedBlockPath() {
@@ -197,6 +149,13 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (_editorState == null) {
+      print(
+          '⚠️ [editor_widget] Editor state is null, showing loading indicator');
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    print('🏗️ [editor_widget] Building editor widget');
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     return ChangeNotifierProvider<ToolbarState>.value(
       value: _toolbarState,
