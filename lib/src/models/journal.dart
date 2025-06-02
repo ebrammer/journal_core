@@ -43,47 +43,15 @@ class Journal {
         throw FormatException('Content is empty');
       }
 
-      // Handle potential double-encoded JSON
-      dynamic decoded = contentJson;
-      int decodeAttempts = 0;
-      const int maxDecodeAttempts = 5;
-      while (decoded is String && decodeAttempts < maxDecodeAttempts) {
-        try {
-          decoded = jsonDecode(decoded);
-          decodeAttempts++;
-          print(
-              'Journal.fromJson: Decoded JSON (attempt $decodeAttempts): $decoded');
-          print('Journal.fromJson: Decoded type: ${decoded.runtimeType}');
-        } catch (e) {
-          print(
-              'Journal.fromJson: Failed to decode JSON at attempt $decodeAttempts: $e');
-          break;
-        }
-      }
-
+      // Parse the content JSON
+      final decoded = jsonDecode(contentJson);
       if (decoded is! Map<String, dynamic>) {
-        throw FormatException(
-            'Decoded content is not a Map. Type: ${decoded.runtimeType}, Value: $decoded');
+        throw FormatException('Content is not a valid JSON object');
       }
 
-      // Validate document structure
-      if (!decoded.containsKey('document') ||
-          decoded['document'] is! Map<String, dynamic>) {
-        throw FormatException(
-            'Invalid or missing "document" field in content: $decoded');
-      }
-
-      final document = decoded['document'] as Map<String, dynamic>;
-      if (!document.containsKey('root') ||
-          document['root'] is! Map<String, dynamic>) {
-        throw FormatException(
-            'Invalid or missing "root" field in document: $document');
-      }
-
-      // Ensure all nodes have required fields
+      // Ensure all nodes have IDs
       final documentWithIds = _addIdsToNodes(decoded);
 
-      print('Journal.fromJson: Passing to Document.fromJson: $documentWithIds');
       return Journal(
         id: json['id'] as String? ?? '',
         title: json['title'] as String? ?? '',

@@ -23,12 +23,14 @@ Document loadDocumentFromJson(String content) {
 
   try {
     final json = jsonDecode(content);
+    Log.info('[journal_core] Parsing JSON: $json');
+
     // Handle both direct document structure and wrapped document structure
     if (json is Map<String, dynamic>) {
       if (json.containsKey('document')) {
         final document = Document.fromJson(json);
         Log.info(
-            '[journal_core] Successfully parsed document: ${document.toJson()}');
+            '[journal_core] Successfully parsed wrapped document: ${document.toJson()}');
         return document;
       } else if (json.containsKey('type') && json.containsKey('children')) {
         // Handle direct document structure
@@ -89,7 +91,7 @@ Document _createFallbackDocument(String content) {
       type: BlockTypeConstants.paragraph,
       attributes: {
         'delta': [
-          {'insert': '[Recovered Content] $displayContent'}
+          {'insert': displayContent}
         ]
       },
     ),
