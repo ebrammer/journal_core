@@ -643,42 +643,34 @@ class _EditorWidgetState extends State<EditorWidget> {
   void _checkForUpdatedContent() {
     if (widget.journal.content != _editorState.document) {
       print(
-          '🔄 [editor_widget] Detected updated content after initial load, reinitializing editor state');
+          '🔄 [editor_widget] Detected updated content after initial load, updating document');
       setState(() {
-        _editorState = EditorState(document: widget.journal.content);
+        // Update the document without reinitializing _editorState
         final transaction = _editorState.transaction;
-        final validCreatedAt = widget.journal.createdAt > 0
-            ? widget.journal.createdAt
-            : DateTime.now().millisecondsSinceEpoch;
-        if (_editorState.document.root.children.isEmpty ||
-            _editorState.document.root.children.first.type !=
-                BlockTypeConstants.metadata) {
-          transaction.insertNode(
-            [0],
-            Node(
-              type: BlockTypeConstants.metadata,
-              attributes: {'created_at': validCreatedAt},
-            ),
-          );
-          print(
-              '📌 [editor_widget] Added metadata block during reinitialization');
+        // Clear existing content if necessary
+        for (int i = _editorState.document.root.children.length - 1;
+            i >= 0;
+            i--) {
+          if (_editorState.document.root.children[i].type !=
+                  BlockTypeConstants.metadata &&
+              _editorState.document.root.children[i].type !=
+                  BlockTypeConstants.spacer) {
+            transaction.deleteNode(_editorState.document.root.children[i]);
+          }
         }
-        if (_editorState.document.root.children.isEmpty ||
-            _editorState.document.root.children.last.type !=
-                BlockTypeConstants.spacer) {
-          transaction.insertNode(
-            [_editorState.document.root.children.length],
-            Node(
-              type: BlockTypeConstants.spacer,
-              attributes: {'height': 100},
-            ),
-          );
-          print(
-              '📌 [editor_widget] Added spacer block during reinitialization');
+        // Add new content from widget.journal.content
+        final newContentChildren = widget.journal.content.root.children;
+        for (int i = 0; i < newContentChildren.length; i++) {
+          if (newContentChildren[i].type != BlockTypeConstants.metadata &&
+              newContentChildren[i].type != BlockTypeConstants.spacer) {
+            transaction.insertNode(
+              [_editorState.document.root.children.length - 1],
+              newContentChildren[i],
+            );
+          }
         }
         _editorState.apply(transaction);
-        print(
-            '✅ [editor_widget] Editor state reinitialized with updated content');
+        print('✅ [editor_widget] Document updated with new content');
       });
     }
   }
