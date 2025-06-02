@@ -25,8 +25,11 @@ class Journal {
       print('🔍 [journal] Parsing JSON: $json');
 
       // Validate content field
-      if (!json.containsKey('content')) {
-        print('⚠️ [journal] No content field found in JSON');
+      if (!json.containsKey('content') ||
+          json['content'] == null ||
+          (json['content'] is Map && json['content'].isEmpty)) {
+        print(
+            '⚠️ [journal] No content field found or content is empty in JSON');
         return Journal.blank();
       }
 
@@ -83,6 +86,7 @@ class Journal {
           ),
         );
         editorState.apply(transaction);
+        print('📌 [journal] Added metadata block');
       }
 
       if (document.root.children.isEmpty ||
@@ -96,6 +100,7 @@ class Journal {
           ),
         );
         editorState.apply(transaction);
+        print('📌 [journal] Added spacer block');
       }
 
       print(
