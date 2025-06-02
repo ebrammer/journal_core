@@ -140,9 +140,17 @@ class _EditorWidgetState extends State<EditorWidget> {
         print(
             '🧱 [editor_widget] Registered block builders: $registeredBuilders');
         final missingBuilders = blockTypes.difference(registeredBuilders);
-        if (missingBuilders.isNotEmpty) {
+        final knownCustomBlocks = {
+          'metadata_block',
+          'spacer_block',
+          'date',
+          'title'
+        };
+        final missingUnknownBuilders =
+            missingBuilders.difference(knownCustomBlocks);
+        if (missingUnknownBuilders.isNotEmpty) {
           print(
-              '⚠️ [editor_widget] Missing builders for block types: $missingBuilders');
+              '⚠️ [editor_widget] Missing builders for block types: $missingUnknownBuilders');
         }
       } catch (e, stackTrace) {
         print('❌ [editor_widget] Failed to apply transaction: $e');

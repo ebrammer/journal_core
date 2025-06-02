@@ -28,14 +28,16 @@ class EditorWrapper extends StatefulWidget {
     this.height,
     required this.onSave,
     required this.onBack,
-    required this.journal,
+    required this.onDelete,
+    this.journal,
   });
 
   final double? width;
   final double? height;
-  final Future Function(Journal updatedJournal) onSave;
+  final Future Function(JournalStruct updatedJournal) onSave;
   final Future Function() onBack;
-  final Journal journal;
+  final Future Function(String journalId) onDelete;
+  final JournalStruct? journal;
 
   @override
   State<EditorWrapper> createState() => _EditorWrapperState();
@@ -44,14 +46,40 @@ class EditorWrapper extends StatefulWidget {
 class _EditorWrapperState extends State<EditorWrapper> {
   @override
   Widget build(BuildContext context) {
+    final journal = widget.journal != null
+        ? Journal(
+            id: widget.journal!.id ?? '',
+            title: widget.journal!.title ?? '',
+            createdAt: widget.journal!.createdat ??
+                DateTime.now().millisecondsSinceEpoch,
+            lastModified: widget.journal!.lastmodified ??
+                DateTime.now().millisecondsSinceEpoch,
+            content: widget.journal!.content != null
+                ? loadDocumentFromJson(widget.journal!.content!)
+                : Document.blank(),
+          )
+        : Journal(
+            id: '',
+            title: '',
+            createdAt: DateTime.now().millisecondsSinceEpoch,
+            lastModified: DateTime.now().millisecondsSinceEpoch,
+            content: Document.blank(),
+          );
+
     return EditorWidget(
-      journal: widget.journal,
-      onSave: widget.onSave,
-      onBack: widget.onBack,
-      onDelete: (journalId) async {
-        // Dummy function to satisfy the required callback
-        print('Delete functionality not implemented in EditorWrapper');
+      journal: journal,
+      onSave: (updatedJournal, contentJson) async {
+        final updatedJournalStruct = JournalStruct(
+          id: updatedJournal.id,
+          title: updatedJournal.title,
+          createdat: updatedJournal.createdAt,
+          lastmodified: updatedJournal.lastModified,
+          content: contentJson,
+        );
+        await widget.onSave(updatedJournalStruct);
       },
+      onBack: widget.onBack,
+      onDelete: widget.onDelete,
     );
   }
 } 
