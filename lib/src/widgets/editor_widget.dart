@@ -106,6 +106,7 @@ class _EditorWidgetState extends State<EditorWidget> {
             attributes: {'created_at': validCreatedAt},
           ),
         );
+        print('📌 [editor_widget] Added metadata block');
       }
       if (_editorState.document.root.children.isEmpty ||
           _editorState.document.root.children.last.type !=
@@ -117,6 +118,7 @@ class _EditorWidgetState extends State<EditorWidget> {
             attributes: {'height': 100},
           ),
         );
+        print('📌 [editor_widget] Added spacer block');
       }
 
       try {
@@ -124,6 +126,20 @@ class _EditorWidgetState extends State<EditorWidget> {
         print('✅ [editor_widget] Editor state initialized successfully');
         print(
             '📊 [editor_widget] Final document structure: ${_editorState.document.toJson()}');
+        // Log all block types in the document to check if builders are registered
+        final blockTypes = _editorState.document.root.children
+            .map((node) => node.type)
+            .toSet();
+        print('🧱 [editor_widget] Block types in document: $blockTypes');
+        final registeredBuilders =
+            standardBlockComponentBuilderMap.keys.toSet();
+        print(
+            '🧱 [editor_widget] Registered block builders: $registeredBuilders');
+        final missingBuilders = blockTypes.difference(registeredBuilders);
+        if (missingBuilders.isNotEmpty) {
+          print(
+              '⚠️ [editor_widget] Missing builders for block types: $missingBuilders');
+        }
       } catch (e, stackTrace) {
         print('❌ [editor_widget] Failed to apply transaction: $e');
         print('📚 [editor_widget] Stack trace: $stackTrace');
