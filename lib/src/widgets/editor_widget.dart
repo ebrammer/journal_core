@@ -57,6 +57,9 @@ class _EditorWidgetState extends State<EditorWidget> {
 
     Log.info('Initializing editor state with content...');
     final document = widget.journal.content;
+    Log.info(
+        '[journal_core] Document structure in editor: ${document.toJson()}');
+
     _editorState = EditorState(document: document);
     EditorGlobals.editorState = _editorState;
 
@@ -64,6 +67,8 @@ class _EditorWidgetState extends State<EditorWidget> {
     final validCreatedAt = widget.journal.createdAt > 0
         ? widget.journal.createdAt
         : DateTime.now().millisecondsSinceEpoch;
+
+    // Only add metadata and spacer if they don't exist
     if (document.root.children.isEmpty ||
         document.root.children.first.type != BlockTypeConstants.metadata) {
       transaction.insertNode(
@@ -86,10 +91,9 @@ class _EditorWidgetState extends State<EditorWidget> {
     try {
       _editorState.apply(transaction);
       Log.info(
-          'Created document with metadata_block and spacer: ${document.toJson()}');
+          '[journal_core] Document after applying transaction: ${document.toJson()}');
     } catch (e, stackTrace) {
-      Log.error(
-          '[EditorWidget.initState] Failed to apply transaction: $e\n$stackTrace');
+      Log.error('[journal_core] Failed to apply transaction: $e\n$stackTrace');
     }
 
     _focusNode = FocusNode();

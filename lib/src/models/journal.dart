@@ -3,6 +3,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart'; // Add uuid package for generating IDs
 import 'block_type_constants.dart';
+import 'package:journal_core/journal_core.dart';
 
 class Journal {
   final String id;
@@ -49,20 +50,31 @@ class Journal {
         throw FormatException('Content is not a valid JSON object');
       }
 
-      // Ensure all nodes have IDs
-      final documentWithIds = _addIdsToNodes(decoded);
+      // Ensure the document has the correct structure
+      Map<String, dynamic> documentWithIds;
+      if (decoded.containsKey('document')) {
+        documentWithIds = _addIdsToNodes(decoded);
+      } else {
+        // If the document is not wrapped, wrap it
+        documentWithIds = _addIdsToNodes({'document': decoded});
+      }
+
+      Log.info(
+          '[journal_core] Document structure before parsing: $documentWithIds');
+      final document = Document.fromJson(documentWithIds);
+      Log.info('[journal_core] Document after parsing: ${document.toJson()}');
 
       return Journal(
         id: json['id'] as String? ?? '',
         title: json['title'] as String? ?? '',
         createdAt: json['createdAt'] as int? ?? 0,
         lastModified: json['lastModified'] as int? ?? 0,
-        content: Document.fromJson(documentWithIds),
+        content: document,
       );
     } catch (e, stackTrace) {
-      print('Journal.fromJson: Failed to parse Journal: $e');
-      print('Journal.fromJson: Stack trace: $stackTrace');
-      print('Journal.fromJson: Input JSON: $json');
+      Log.error('[journal_core] Failed to parse Journal: $e');
+      Log.error('[journal_core] Stack trace: $stackTrace');
+      Log.error('[journal_core] Input JSON: $json');
       return Journal(
         id: json['id'] as String? ?? '',
         title: json['title'] as String? ?? '',
