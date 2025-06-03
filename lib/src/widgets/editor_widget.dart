@@ -437,6 +437,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                               return false;
                             },
                             child: AppFlowyEditor(
+                              key: ValueKey(
+                                  _editorState.document.toJson().toString()),
                               editorState: _editorState,
                               focusNode: _focusNode,
                               blockComponentBuilders: {
@@ -670,6 +672,12 @@ class _EditorWidgetState extends State<EditorWidget> {
           }
         }
         _editorState.apply(transaction);
+        // Update selection to ensure it points to a valid position
+        if (_editorState.document.root.children.length > 1) {
+          _editorState.selection = Selection.collapsed(
+            Position(path: [1], offset: 0),
+          );
+        }
         print('✅ [editor_widget] Document updated with new content');
       });
     }
