@@ -271,13 +271,19 @@ class _EditorWidgetState extends State<EditorWidget> {
       child: Scaffold(
         backgroundColor: theme.primaryBackground,
         appBar: AppBar(
-          backgroundColor: theme.primaryBackground,
+          backgroundColor: Colors.white,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.white,
+            statusBarIconBrightness: Brightness.dark,
+          ),
           elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           titleSpacing: 0,
           leadingWidth: 0,
           automaticallyImplyLeading: false,
           title: Padding(
-            padding: const EdgeInsets.only(left: 4, right: 16),
+            padding: const EdgeInsets.only(left: 4, right: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -341,6 +347,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.of(context).pop(),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: theme.primaryText,
+                                  ),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
@@ -352,7 +361,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                                     await widget.onDelete(widget.journal.id);
                                   },
                                   style: TextButton.styleFrom(
-                                    foregroundColor: Colors.red,
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
                                   ),
                                   child: const Text('Delete'),
                                 ),
@@ -364,43 +374,10 @@ class _EditorWidgetState extends State<EditorWidget> {
                       color: Theme.of(context).iconTheme.color,
                       iconSize: 24.0,
                       constraints: const BoxConstraints(
-                        minWidth: 24,
-                        minHeight: 24,
+                        minWidth: 48,
+                        minHeight: 48,
                       ),
-                      padding: EdgeInsets.zero,
-                    ),
-                    const SizedBox(width: 12.0),
-                    TextButton(
-                      onPressed: () async {
-                        final content = _controller.getDocumentContent();
-                        final updatedJournal = Journal(
-                          id: widget.journal.id,
-                          title: _currentTitle,
-                          createdAt: widget.journal.createdAt,
-                          lastModified: DateTime.now().millisecondsSinceEpoch,
-                          content: _editorState.document,
-                        );
-                        Log.info(
-                            '🔍 Saving journal: ${updatedJournal.toJson()}');
-                        await widget.onSave(updatedJournal, content);
-                      },
-                      style: TextButton.styleFrom(
-                        backgroundColor: theme.primaryText,
-                        foregroundColor: theme.primaryBackground,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8.0, vertical: 6.0),
-                        minimumSize: const Size(0, 0),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                      child: const Text(
-                        'Done',
-                        style: TextStyle(
-                          fontSize: 14.0,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      padding: const EdgeInsets.all(12.0),
                     ),
                   ],
                 ),
