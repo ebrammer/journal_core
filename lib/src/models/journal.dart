@@ -140,12 +140,37 @@ class Journal {
   }
 
   factory Journal.blank() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final document = Document(
+      root: Node(
+        type: BlockTypeConstants.page,
+        children: [
+          Node(
+            type: BlockTypeConstants.metadata,
+            attributes: {'created_at': now},
+          ),
+          Node(
+            type: BlockTypeConstants.paragraph,
+            attributes: {
+              'delta': [
+                {'insert': ''}
+              ]
+            },
+          ),
+          Node(
+            type: BlockTypeConstants.spacer,
+            attributes: {'height': 100},
+          ),
+        ],
+      ),
+    );
+
     return Journal(
       id: '',
       title: '',
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      lastModified: DateTime.now().millisecondsSinceEpoch,
-      content: Document.blank(),
+      createdAt: now,
+      lastModified: now,
+      content: document,
     );
   }
 }
