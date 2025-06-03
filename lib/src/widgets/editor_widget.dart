@@ -455,9 +455,10 @@ class _EditorWidgetState extends State<EditorWidget> {
                                     });
                                   },
                                   titleFocusNode: _titleFocusNode,
-                                  onTitleEditingComplete: _focusFirstRealBlock,
+                                  onTitleEditingComplete: () =>
+                                      _titleFocusNode.unfocus(),
                                   onTitleSubmitted: (_) =>
-                                      _focusFirstRealBlock(),
+                                      _titleFocusNode.unfocus(),
                                   readOnly: false,
                                 ),
                                 'date': MetadataBlockBuilder(
@@ -480,9 +481,10 @@ class _EditorWidgetState extends State<EditorWidget> {
                                     });
                                   },
                                   titleFocusNode: _titleFocusNode,
-                                  onTitleEditingComplete: _focusFirstRealBlock,
+                                  onTitleEditingComplete: () =>
+                                      _titleFocusNode.unfocus(),
                                   onTitleSubmitted: (_) =>
-                                      _focusFirstRealBlock(),
+                                      _titleFocusNode.unfocus(),
                                   readOnly: false,
                                 ),
                                 divider.DividerBlockKeys.type:
@@ -613,21 +615,6 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   void _updateBlocks() {
     Log.info('🔍 EditorWidget: Triggered _updateBlocks');
-  }
-
-  void _focusFirstRealBlock() {
-    final children = _editorState.document.root.children;
-    for (int i = 0; i < children.length; i++) {
-      final node = children[i];
-      if (node.type != BlockTypeConstants.metadata &&
-          node.type != BlockTypeConstants.spacer) {
-        _titleFocusNode.unfocus();
-        _editorState.selection = Selection.collapsed(
-          Position(path: [i], offset: 0),
-        );
-        break;
-      }
-    }
   }
 
   void _deleteDivider(Node node) {
