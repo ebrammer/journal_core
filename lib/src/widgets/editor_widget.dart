@@ -313,7 +313,6 @@ class _EditorWidgetState extends State<EditorWidget> {
                       ),
                       padding: EdgeInsets.zero,
                     ),
-                    const SizedBox(width: 8.0),
                     if (_showCollapsedTitle)
                       Container(
                         constraints: BoxConstraints(
@@ -336,40 +335,11 @@ class _EditorWidgetState extends State<EditorWidget> {
                   children: [
                     IconButton(
                       icon: const Icon(JournalIcons.jtrash, size: 20),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AlertDialog(
-                              title: const Text('Delete Journal'),
-                              content: const Text(
-                                  'Are you sure you want to delete this journal? This action cannot be undone.'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: theme.primaryText,
-                                  ),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () async {
-                                    Navigator.of(context).pop();
-                                    Navigator.of(context).pop();
-                                    Log.info(
-                                        '🔍 Deleting journal ID: ${widget.journal.id}');
-                                    await widget.onDelete(widget.journal.id);
-                                  },
-                                  style: TextButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Delete'),
-                                ),
-                              ],
-                            );
-                          },
-                        );
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        Log.info(
+                            '🔍 Deleting journal ID: ${widget.journal.id}');
+                        await widget.onDelete(widget.journal.id);
                       },
                       color: Theme.of(context).iconTheme.color,
                       iconSize: 24.0,
