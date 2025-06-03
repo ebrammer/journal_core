@@ -89,8 +89,10 @@ class _EditorWidgetState extends State<EditorWidget> {
           ),
         );
         _editorState = EditorState(document: fixedDocument);
+        EditorGlobals.editorState = _editorState;
       } else {
         _editorState = EditorState(document: document);
+        EditorGlobals.editorState = _editorState;
       }
 
       // Add metadata and spacer blocks if they don't exist
@@ -207,13 +209,13 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   void dispose() {
+    EditorGlobals.editorState = null; // Clear the global editor state
     _editorState.selectionNotifier.removeListener(_onSelectionChanged);
-    titleController.dispose();
     _titleFocusNode.dispose();
     _focusNode.dispose();
+    titleController.dispose();
     _controller.dispose();
     _toolbarState.dispose();
-    EditorGlobals.editorState = null;
     super.dispose();
   }
 
