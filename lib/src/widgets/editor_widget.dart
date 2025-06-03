@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
@@ -227,6 +228,31 @@ class _EditorWidgetState extends State<EditorWidget> {
       setState(() {
         _showDeleteFab = true;
       });
+    }
+  }
+
+  void _handleTitleKeyPress(RawKeyEvent event) {
+    if (event is RawKeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.enter) {
+      // Find the first content block (after metadata)
+      int firstContentIndex = 0;
+      for (int i = 0; i < _editorState.document.root.children.length; i++) {
+        if (_editorState.document.root.children[i].type !=
+                BlockTypeConstants.metadata &&
+            _editorState.document.root.children[i].type !=
+                BlockTypeConstants.spacer) {
+          firstContentIndex = i;
+          break;
+        }
+      }
+
+      // Set selection to the first content block
+      _editorState.selection = Selection.collapsed(
+        Position(path: [firstContentIndex], offset: 0),
+      );
+
+      // Request focus for the editor
+      _focusNode.requestFocus();
     }
   }
 
