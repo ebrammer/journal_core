@@ -674,10 +674,28 @@ class _EditorWidgetState extends State<EditorWidget> {
         _editorState.apply(transaction);
         // Update selection to ensure it points to a valid position
         if (_editorState.document.root.children.length > 1) {
+          // Find the first non-metadata block
+          int firstContentIndex = 0;
+          for (int i = 0; i < _editorState.document.root.children.length; i++) {
+            if (_editorState.document.root.children[i].type !=
+                    BlockTypeConstants.metadata &&
+                _editorState.document.root.children[i].type !=
+                    BlockTypeConstants.spacer) {
+              firstContentIndex = i;
+              break;
+            }
+          }
           _editorState.selection = Selection.collapsed(
-            Position(path: [1], offset: 0),
+            Position(path: [firstContentIndex], offset: 0),
           );
+          print(
+              '🔍 [editor_widget] Selection updated to first content block at index: $firstContentIndex');
         }
+        // Log detailed document structure for debugging
+        print(
+            '📊 [editor_widget] Updated document structure: ${_editorState.document.toJson()}');
+        print(
+            '🧱 [editor_widget] Block types after update: ${_editorState.document.root.children.map((node) => node.type).toList()}');
         print('✅ [editor_widget] Document updated with new content');
       });
     }
