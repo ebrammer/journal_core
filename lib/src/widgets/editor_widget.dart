@@ -336,7 +336,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                     IconButton(
                       icon: const Icon(JournalIcons.jtrash, size: 20),
                       onPressed: () async {
+                        // First navigate back
                         Navigator.of(context).pop();
+                        // Then perform deletion
                         Log.info(
                             '🔍 Deleting journal ID: ${widget.journal.id}');
                         await widget.onDelete(widget.journal.id);
