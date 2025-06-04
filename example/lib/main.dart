@@ -180,9 +180,9 @@ class EditorScreen extends StatelessWidget {
             Navigator.of(context).pop();
           }
         },
-        onDelete: (journalId) async {
-          debugPrint("Deleted journal: $journalId");
-          onJournalDeleted(journalId);
+        onDelete: () async {
+          debugPrint("Deleted journal: ${journal.id}");
+          onJournalDeleted(journal.id);
           if (Navigator.canPop(context)) {
             Navigator.of(context).pop();
           }

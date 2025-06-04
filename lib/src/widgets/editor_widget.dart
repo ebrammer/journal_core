@@ -299,10 +299,13 @@ class _EditorWidgetState extends State<EditorWidget> {
       child: Scaffold(
         backgroundColor: theme.primaryBackground,
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.white,
-            statusBarIconBrightness: Brightness.dark,
+          backgroundColor: theme.primaryBackground,
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: theme.primaryBackground,
+            statusBarIconBrightness:
+                Theme.of(context).brightness == Brightness.dark
+                    ? Brightness.light
+                    : Brightness.dark,
           ),
           elevation: 0,
           scrolledUnderElevation: 0,
