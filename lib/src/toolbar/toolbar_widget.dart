@@ -34,15 +34,10 @@ class JournalToolbar extends StatefulWidget {
   final VoidCallback? onDocumentChanged;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
-  final Future Function(
-      {required String title,
-      required String content,
-      required String id})? onPrayer;
-  final Future Function(
-      {required String title,
-      required String content,
-      required String id})? onScripture;
-  final Future Function({required String title, required String id})? onTag;
+  final Future Function({String? title, String? content, String? id})? onPrayer;
+  final Future Function({String? title, String? content, String? id})?
+      onScripture;
+  final Future Function({String? title, String? id})? onTag;
 
   @override
   State<JournalToolbar> createState() => _JournalToolbarState();
@@ -188,11 +183,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         label: 'Prayer',
                         onTap: () async {
                           if (widget.onPrayer != null) {
-                            await widget.onPrayer!(
-                              title: '',
-                              content: '',
-                              id: '',
-                            );
+                            await widget.onPrayer!();
                           }
                         },
                       ),
@@ -202,11 +193,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         label: 'Scripture',
                         onTap: () async {
                           if (widget.onScripture != null) {
-                            await widget.onScripture!(
-                              title: '',
-                              content: '',
-                              id: '',
-                            );
+                            await widget.onScripture!();
                           }
                         },
                       ),
@@ -216,10 +203,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         label: 'Tag',
                         onTap: () async {
                           if (widget.onTag != null) {
-                            await widget.onTag!(
-                              title: '',
-                              id: '',
-                            );
+                            await widget.onTag!();
                           }
                         },
                       ),
