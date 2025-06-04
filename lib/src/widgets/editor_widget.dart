@@ -47,6 +47,34 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   bool _isMovingBlock = false;
 
+  bool _hasMeaningfulContent() {
+    // Check if title is not empty
+    if (_currentTitle.trim().isNotEmpty) {
+      return true;
+    }
+
+    // Check if there are any content blocks (excluding metadata and spacer)
+    for (final node in _editorState.document.root.children) {
+      if (node.type != BlockTypeConstants.metadata &&
+          node.type != BlockTypeConstants.spacer) {
+        // For text blocks, check if they have any content
+        if (node.type == BlockTypeConstants.paragraph) {
+          final delta = node.attributes['delta'] as List<dynamic>?;
+          if (delta != null && delta.isNotEmpty) {
+            final text = delta.map((d) => d['insert'] as String).join('');
+            if (text.trim().isNotEmpty) {
+              return true;
+            }
+          }
+        } else {
+          // For other block types (like dividers), consider them as content
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -292,6 +320,11 @@ class _EditorWidgetState extends State<EditorWidget> {
                     IconButton(
                       icon: const Icon(JournalIcons.jarrowLeft, size: 24),
                       onPressed: () async {
+                        if (!_hasMeaningfulContent()) {
+                          // If no meaningful content, just go back without saving
+                          await widget.onBack();
+                          return;
+                        }
                         final content = _controller.getDocumentContent();
                         final updatedJournal = Journal(
                           id: widget.journal.id,
@@ -492,6 +525,11 @@ class _EditorWidgetState extends State<EditorWidget> {
                     editorState: _editorState,
                     controller: _controller,
                     onSave: () async {
+                      if (!_hasMeaningfulContent()) {
+                        // If no meaningful content, just go back without saving
+                        await widget.onBack();
+                        return;
+                      }
                       final content = _controller.getDocumentContent();
                       final updatedJournal = Journal(
                         id: widget.journal.id,
