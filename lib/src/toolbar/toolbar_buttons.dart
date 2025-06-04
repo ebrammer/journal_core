@@ -184,17 +184,48 @@ class ToolbarButtons {
         isActive: () =>
             toolbarState.currentBlockType == BlockTypeConstants.divider,
       ),
-      // ToolbarButtonConfig(
-      //   key: 'prayer',
-      //   icon: JournalIcons.jprayer,
-      //   onPressed: () => actions.handleInsertPrayer(),
-      // ),
-      // ToolbarButtonConfig(
-      //   key: 'scripture',
-      //   icon: JournalIcons.jscripture,
-      //   onPressed: () => actions.handleInsertScripture(),
-      // ),
+      ToolbarButtonConfig(
+        key: 'actions',
+        icon: JournalIcons.jdotsThree,
+        onPressed: () =>
+            toolbarState.showActionsMenu = !toolbarState.showActionsMenu,
+        isActive: () => toolbarState.showActionsMenu,
+      ),
     ];
+  }
+
+  List<ToolbarButtonConfig> getActionButtons() {
+    final buttons = <ToolbarButtonConfig>[];
+
+    // Add delete button for dividers
+    if (toolbarState.currentBlockType == BlockTypeConstants.divider) {
+      buttons.add(ToolbarButtonConfig(
+        key: 'delete',
+        icon: JournalIcons.jxCircle,
+        onPressed: () => actions.handleDelete(),
+      ));
+    }
+
+    // Add copy, cut, paste buttons
+    buttons.addAll([
+      ToolbarButtonConfig(
+        key: 'copy',
+        icon: JournalIcons.jcopy,
+        onPressed: () => actions.handleCopyToClipboard(),
+      ),
+      ToolbarButtonConfig(
+        key: 'cut',
+        icon: JournalIcons.jscissors,
+        onPressed: () => actions.handleCutToClipboard(),
+      ),
+      ToolbarButtonConfig(
+        key: 'paste',
+        icon: JournalIcons.jclipboard,
+        onPressed: () => actions.handlePasteFromClipboard(),
+      ),
+    ]);
+
+    return buttons;
   }
 
   List<ToolbarButtonConfig> getSelectionButtons() {
@@ -222,11 +253,6 @@ class ToolbarButtons {
         icon: JournalIcons.jtextStrikethrough,
         onPressed: () => actions.handleToggleStyle('strikethrough'),
         isActive: () => toolbarState.isStyleStrikethrough,
-      ),
-      ToolbarButtonConfig(
-        key: 'copy',
-        icon: JournalIcons.jcopy,
-        onPressed: () => actions.handleCopyToClipboard(),
       ),
     ];
   }

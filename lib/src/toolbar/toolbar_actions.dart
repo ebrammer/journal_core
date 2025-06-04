@@ -544,23 +544,23 @@ class ToolbarActions {
     transaction.deleteNode(node);
     editorState.apply(transaction);
 
-    // Try to select the next node, or the previous node if no next node exists
+    // Try to select the previous node first, then fall back to next node if no previous exists
     final parentPath =
         selection.start.path.sublist(0, selection.start.path.length - 1);
     final currentIndex = selection.start.path.last;
     final parentNode = editorState.getNodeAtPath(parentPath);
 
     if (parentNode != null) {
-      if (currentIndex < parentNode.children.length) {
-        // Select next node
-        editorState.selection = Selection.single(
-          path: [...parentPath, currentIndex],
-          startOffset: 0,
-        );
-      } else if (currentIndex > 0) {
+      if (currentIndex > 0) {
         // Select previous node
         editorState.selection = Selection.single(
           path: [...parentPath, currentIndex - 1],
+          startOffset: 0,
+        );
+      } else if (currentIndex < parentNode.children.length) {
+        // Select next node if no previous node exists
+        editorState.selection = Selection.single(
+          path: [...parentPath, currentIndex],
           startOffset: 0,
         );
       }
@@ -577,31 +577,175 @@ class ToolbarActions {
     final node = editorState.getNodeAtPath(selection.start.path);
     if (node == null) return;
 
-    final delta = node.attributes['delta'] as List? ?? [];
+    final attributes = Map<String, dynamic>.from(node.attributes);
+    final delta = attributes['delta'] as List? ?? [];
     if (delta.isEmpty) return;
 
     final startOffset = selection.start.offset;
     final endOffset = selection.end.offset;
     var currentOffset = 0;
-    final selectedText = StringBuffer();
+    final selectedText = <String>[];
 
-    for (final op in delta) {
-      final opText = op['insert'] as String;
-      final opLength = opText.length;
-      if (currentOffset + opLength > startOffset && currentOffset < endOffset) {
-        final selectionStart = startOffset - currentOffset;
-        final selectionEnd = endOffset - currentOffset;
-        selectedText.write(opText.substring(
-          selectionStart.clamp(0, opLength),
-          selectionEnd.clamp(0, opLength),
-        ));
+    for (final item in delta) {
+      final text = item['insert'] as String;
+      final length = text.length;
+      if (currentOffset + length > startOffset && currentOffset < endOffset) {
+        final start =
+            startOffset > currentOffset ? startOffset - currentOffset : 0;
+        final end = endOffset < currentOffset + length
+            ? endOffset - currentOffset
+            : length;
+        selectedText.add(text.substring(start, end));
       }
-      currentOffset += opLength;
+      currentOffset += length;
     }
 
-    if (selectedText.isNotEmpty) {
-      Clipboard.setData(ClipboardData(text: selectedText.toString()));
+    final text = selectedText.join('');
+    if (text.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: text));
       toolbarState.hasClipboardContent = true;
+      toolbarState.notifyListeners();
+
+      // Move selection to the left of the copied text
+      editorState.selection = Selection.single(
+        path: selection.start.path,
+        startOffset: selection.start.offset,
+      );
+    }
+  }
+
+  void handleCutToClipboard() {
+    final selection = editorState.selection;
+    if (selection == null || selection.isCollapsed) return;
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) return;
+
+    final savedSelection = selection;
+    final hadFocus = focusNode?.hasFocus ?? false;
+
+    // First copy the text
+    handleCopyToClipboard();
+
+    // Then delete the selected text
+    final transaction = editorState.transaction;
+    transaction.deleteText(
+      node,
+      selection.start.offset,
+      selection.end.offset - selection.start.offset,
+    );
+    editorState.apply(transaction);
+
+    // Move cursor to the left of the cut text without selecting
+    editorState.selection = Selection.single(
+      path: savedSelection.start.path,
+      startOffset: savedSelection.start.offset,
+    );
+
+    if (hadFocus && focusNode != null) {
+      focusNode!.requestFocus();
+    }
+  }
+
+  void handlePasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data == null || data.text == null || data.text!.isEmpty) return;
+
+    final selection = editorState.selection;
+    if (selection == null) return;
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) return;
+
+    final savedSelection = selection;
+    final hadFocus = focusNode?.hasFocus ?? false;
+
+    final transaction = editorState.transaction;
+    if (selection.isCollapsed) {
+      transaction.insertText(
+        node,
+        selection.start.offset,
+        data.text!,
+      );
+    } else {
+      transaction.deleteText(
+        node,
+        selection.start.offset,
+        selection.end.offset - selection.start.offset,
+      );
+      transaction.insertText(
+        node,
+        selection.start.offset,
+        data.text!,
+      );
+    }
+    editorState.apply(transaction);
+
+    // Clear the clipboard and update toolbar state
+    await Clipboard.setData(const ClipboardData(text: ''));
+    toolbarState.hasClipboardContent = false;
+    toolbarState.notifyListeners();
+
+    // Restore selection and focus
+    editorState.selection = savedSelection;
+    if (hadFocus && focusNode != null) {
+      focusNode!.requestFocus();
+    }
+  }
+
+  void handleInsertPrayer() {
+    final selection = editorState.selection;
+    if (selection == null) return;
+    final index = selection.start.path.first;
+
+    final savedSelection = selection;
+    final hadFocus = focusNode?.hasFocus ?? false;
+
+    final transaction = editorState.transaction;
+    transaction.insertNode(
+      Path.from([index + 1]),
+      Node(
+        type: 'prayer',
+        attributes: {
+          'delta': [
+            {'insert': ''}
+          ]
+        },
+      ),
+    );
+    editorState.apply(transaction);
+    toolbarState.showInsertMenu = false;
+
+    editorState.selection = savedSelection;
+    if (hadFocus && focusNode != null) {
+      focusNode!.requestFocus();
+    }
+  }
+
+  void handleInsertScripture() {
+    final selection = editorState.selection;
+    if (selection == null) return;
+    final index = selection.start.path.first;
+
+    final savedSelection = selection;
+    final hadFocus = focusNode?.hasFocus ?? false;
+
+    final transaction = editorState.transaction;
+    transaction.insertNode(
+      Path.from([index + 1]),
+      Node(
+        type: 'scripture',
+        attributes: {
+          'delta': [
+            {'insert': ''}
+          ]
+        },
+      ),
+    );
+    editorState.apply(transaction);
+    toolbarState.showInsertMenu = false;
+
+    editorState.selection = savedSelection;
+    if (hadFocus && focusNode != null) {
+      focusNode!.requestFocus();
     }
   }
 }

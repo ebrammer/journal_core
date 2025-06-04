@@ -10,6 +10,7 @@ class ToolbarState extends ChangeNotifier {
   bool isDragMode = false; // Added drag mode flag
   bool showInsertMenu = false;
   bool showLayoutMenu = false;
+  bool showActionsMenu = false; // Added for actions submenu
   String currentBlockType = BlockTypeConstants.paragraph;
   int? headingLevel;
   bool isStyleBold = false;

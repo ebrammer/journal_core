@@ -91,7 +91,12 @@ class _JournalToolbarState extends State<JournalToolbar> {
         children: [
           // Insert Menu
           Align(
-            alignment: Alignment.centerLeft,
+            alignment:
+                (toolbarState.currentBlockType == BlockTypeConstants.divider) ||
+                        (widget.editorState.selection != null &&
+                            !widget.editorState.selection!.isCollapsed)
+                    ? Alignment.center
+                    : Alignment.centerLeft,
             child: Container(
               padding: const EdgeInsets.only(top: 0, bottom: 8.0),
               decoration: const BoxDecoration(
@@ -100,43 +105,80 @@ class _JournalToolbarState extends State<JournalToolbar> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
+                  mainAxisAlignment: (toolbarState.currentBlockType ==
+                              BlockTypeConstants.divider) ||
+                          (widget.editorState.selection != null &&
+                              !widget.editorState.selection!.isCollapsed)
+                      ? MainAxisAlignment.center
+                      : MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const SizedBox(width: 12.0),
-                    _buildInsertPill(
-                      icon: JournalIcons.jrowsPlusTop,
-                      label: 'Insert Above',
-                      onTap: () => _actions.handleInsertAbove(),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildInsertPill(
-                      icon: JournalIcons.jrowsPlusBottom,
-                      label: 'Insert Below',
-                      onTap: () => _actions.handleInsertBelow(),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildInsertPill(
-                      icon: JournalIcons.jminus,
-                      label: 'Divider',
-                      onTap: () => _actions.handleInsertDivider(),
-                      isActive: toolbarState.currentBlockType ==
-                          BlockTypeConstants.divider,
-                    ),
-                    // const SizedBox(width: 8),
-                    // _buildInsertPill(
-                    //   icon: JournalIcons.jfire,
-                    //   label: 'Prayer',
-                    //   onTap: () => actions.handleInsertPrayer(),
-                    // ),
-                    // const SizedBox(width: 8),
-                    // _buildInsertPill(
-                    //   icon: JournalIcons.jbibleregular,
-                    //   label: 'Scripture',
-                    //   onTap: () => actions.handleInsertScripture(),
-                    // ),
-                    const SizedBox(width: 12.0),
+                    const SizedBox(width: 8.0),
+                    if (!toolbarState.isDragMode) ...[
+                      if (toolbarState.currentBlockType ==
+                          BlockTypeConstants.divider)
+                        _buildInsertPill(
+                          icon: JournalIcons.jxCircle,
+                          label: 'Delete',
+                          onTap: () => _actions.handleDelete(),
+                        )
+                      else if (widget.editorState.selection != null &&
+                          !widget.editorState.selection!.isCollapsed) ...[
+                        _buildInsertPill(
+                          icon: JournalIcons.jcopy,
+                          label: 'Copy',
+                          onTap: () => _actions.handleCopyToClipboard(),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jscissors,
+                          label: 'Cut',
+                          onTap: () => _actions.handleCutToClipboard(),
+                        ),
+                      ] else ...[
+                        if (toolbarState.hasClipboardContent)
+                          _buildInsertPill(
+                            icon: JournalIcons.jclipboard,
+                            label: 'Paste',
+                            onTap: () => _actions.handlePasteFromClipboard(),
+                          ),
+                        if (toolbarState.hasClipboardContent)
+                          const SizedBox(width: 8),
+                        // _buildInsertPill(
+                        //   icon: JournalIcons.jfire,
+                        //   label: 'Prayer',
+                        //   onTap: () => _actions.handleInsertPrayer(),
+                        // ),
+                        // const SizedBox(width: 8),
+                        // _buildInsertPill(
+                        //   icon: JournalIcons.jbibleregular,
+                        //   label: 'Scripture',
+                        //   onTap: () => _actions.handleInsertScripture(),
+                        // ),
+                        // const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jminus,
+                          label: 'Divider',
+                          onTap: () => _actions.handleInsertDivider(),
+                          isActive: toolbarState.currentBlockType ==
+                              BlockTypeConstants.divider,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jrowsPlusTop,
+                          label: 'Insert Above',
+                          onTap: () => _actions.handleInsertAbove(),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jrowsPlusBottom,
+                          label: 'Insert Below',
+                          onTap: () => _actions.handleInsertBelow(),
+                        ),
+                      ],
+                    ],
+                    const SizedBox(width: 8.0),
                   ],
                 ),
               ),
@@ -158,58 +200,26 @@ class _JournalToolbarState extends State<JournalToolbar> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Non-expanded: Plus or Circle X
+                // Non-expanded: Drag button
                 Row(
                   children: [
                     _buildToolbarButton(ToolbarButtonConfig(
-                      key: 'menu_toggle',
-                      icon: isSubMenu
-                          ? JournalIcons.jxCircle
-                          : JournalIcons.jplusCircle,
-                      onPressed: isSubMenu
-                          ? () {
-                              setState(() {
-                                if (toolbarState.isDragMode) {
-                                  // Preserve selection when exiting drag mode
-                                  if (widget.editorState.selection == null) {
-                                    final firstNode = widget.editorState
-                                            .document.root.children.isNotEmpty
-                                        ? widget.editorState.document.root
-                                            .children.first
-                                        : null;
-                                    if (firstNode != null) {
-                                      widget.editorState.selection =
-                                          Selection.collapsed(
-                                              Position(path: firstNode.path));
-                                      Log.info(
-                                          '🔍 Restored selection on drag mode exit: ${widget.editorState.selection}');
-                                    }
-                                  }
-                                  toolbarState.isDragMode = false;
-                                  Log.info('🔍 Exited drag mode');
-                                } else if (toolbarState.showTextStyles) {
-                                  widget.editorState.selection =
-                                      Selection.single(
-                                    path: widget
-                                        .editorState.selection!.start.path,
-                                    startOffset: widget
-                                        .editorState.selection!.start.offset,
-                                  );
-                                  toolbarState.showTextStyles = false;
-                                } else if (toolbarState.showLayoutMenu) {
-                                  toolbarState.showLayoutMenu = false;
-                                  toolbarState.isDragMode = false;
-                                } else {
-                                  toolbarState.showInsertMenu = false;
-                                }
-                              });
-                              widget.controller.syncToolbarWithSelection();
-                            }
-                          : () {
-                              setState(() {
-                                toolbarState.showInsertMenu = true;
-                              });
-                            },
+                      key: 'drag',
+                      icon: toolbarState.isDragMode
+                          ? JournalIcons.jarrowLeft
+                          : JournalIcons.jarrowsDownUp,
+                      onPressed: () {
+                        toolbarState.isDragMode = !toolbarState.isDragMode;
+                        // Ensure a selection exists to keep toolbar visible
+                        if (toolbarState.isDragMode) {
+                          widget.controller.ensureValidSelection();
+                          Log.info(
+                              '🔍 Drag mode entered, selection: ${widget.editorState.selection}');
+                        }
+                        toolbarState.notifyListeners();
+                        Log.info(
+                            '🔍 Drag mode toggled: ${toolbarState.isDragMode}');
+                      },
                     )),
                     const DividerVertical(),
                   ],
@@ -227,7 +237,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                     ),
                   ),
                 ),
-                // Non-expanded: Keyboard or drag buttons
+                // Non-expanded: Keyboard button
                 Row(
                   children: [
                     const SizedBox(width: 4.0),
@@ -237,23 +247,6 @@ class _JournalToolbarState extends State<JournalToolbar> {
                           .getDragButtons()
                           .map(_buildToolbarButton)
                     else ...[
-                      _buildToolbarButton(ToolbarButtonConfig(
-                        key: 'drag',
-                        icon: JournalIcons.jarrowsDownUp,
-                        onPressed: () {
-                          toolbarState.isDragMode = !toolbarState.isDragMode;
-                          // Ensure a selection exists to keep toolbar visible
-                          if (toolbarState.isDragMode) {
-                            widget.controller.ensureValidSelection();
-                            Log.info(
-                                '🔍 Drag mode entered, selection: ${widget.editorState.selection}');
-                          }
-                          toolbarState.notifyListeners();
-                          Log.info(
-                              '🔍 Drag mode toggled: ${toolbarState.isDragMode}');
-                        },
-                        isActive: () => toolbarState.isDragMode,
-                      )),
                       _buildToolbarButton(ToolbarButtonConfig(
                         key: 'keyboard',
                         icon: JournalIcons.jkeyboard,
@@ -311,6 +304,12 @@ class _JournalToolbarState extends State<JournalToolbar> {
           ),
         ),
       ];
+    } else if (toolbarState.showActionsMenu) {
+      Log.info('🔧 Toolbar: Showing action buttons');
+      return _buttonFactory
+          .getActionButtons()
+          .map(_buildToolbarButton)
+          .toList();
     } else if (toolbarState.showInsertMenu) {
       Log.info('🔧 Toolbar: Showing insert menu buttons');
       return _buttonFactory

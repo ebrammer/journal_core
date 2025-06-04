@@ -564,61 +564,6 @@ class _EditorWidgetState extends State<EditorWidget> {
                   ),
                 ],
               ),
-              if (_editorState.selection != null && _showDeleteFab)
-                Consumer<ToolbarState>(
-                  builder: (context, toolbarState, _) {
-                    if (toolbarState.isDragMode) {
-                      return const SizedBox.shrink();
-                    }
-                    final selectedNode = _editorState
-                        .getNodeAtPath(_editorState.selection!.start.path);
-                    if (selectedNode?.type == divider.DividerBlockKeys.type) {
-                      return Positioned(
-                        bottom: 56,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _showDeleteFab = false;
-                              });
-                              _deleteDivider(selectedNode!);
-                            },
-                            style: TextButton.styleFrom(
-                              backgroundColor: theme.primaryBackground,
-                              foregroundColor: theme.primaryText,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8.0, vertical: 8.0),
-                              minimumSize: const Size(0, 0),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
-                                side: BorderSide(
-                                    color: theme.primaryText, width: 0.5),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(JournalIcons.jxCircle, size: 14),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Divider',
-                                  style: TextStyle(
-                                    fontSize: 12.0,
-                                    fontWeight: FontWeight.w400,
-                                    color: theme.primaryText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
             ],
           ),
         ),
