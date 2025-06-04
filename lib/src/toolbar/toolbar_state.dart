@@ -53,13 +53,13 @@ class ToolbarState extends ChangeNotifier {
   void setSelectionInfo({
     required bool isVisible,
     required bool showTextStyles,
-    required bool isDragMode, // Added parameter
+    required bool isDragMode,
     required List<int>? selectionPath,
     required String? previousSiblingType,
   }) {
     this.isVisible = isVisible;
     this.showTextStyles = showTextStyles;
-    this.isDragMode = isDragMode; // Update drag mode
+    this.isDragMode = isDragMode;
     currentSelectionPath = selectionPath;
     this.previousSiblingType = previousSiblingType;
     notifyListeners();

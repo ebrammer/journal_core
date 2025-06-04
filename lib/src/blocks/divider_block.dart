@@ -88,7 +88,10 @@ class _DividerBlockComponentWidgetState
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = _editorState.selection?.start.path == widget.node.path;
+    final selection = _editorState.selection;
+    final isSelected = selection != null &&
+        selection.start.path.isNotEmpty &&
+        selection.start.path.first == widget.node.path.first;
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
     return InkWell(
@@ -99,9 +102,10 @@ class _DividerBlockComponentWidgetState
         );
       },
       child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF2196F3).withOpacity(0.1)
+              ? theme.primaryText.withOpacity(0.05)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),
