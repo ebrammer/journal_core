@@ -17,13 +17,13 @@ class EditorWidget extends StatefulWidget {
     required this.journal,
     required this.onSave,
     required this.onBack,
-    required this.onDelete, // Added onDelete callback
+    required this.onDelete,
   });
 
   final Journal journal;
   final Future Function(Journal updatedJournal, String contentJson) onSave;
   final Future Function() onBack;
-  final Future Function(String journalId) onDelete; // New callback
+  final Future Function() onDelete;
 
   @override
   State<EditorWidget> createState() => _EditorWidgetState();
@@ -338,7 +338,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                       onPressed: () async {
                         Log.info(
                             '🔍 Deleting journal ID: ${widget.journal.id}');
-                        await widget.onDelete(widget.journal.id);
+                        await widget.onDelete();
                       },
                       color: Theme.of(context).iconTheme.color,
                       iconSize: 24.0,
