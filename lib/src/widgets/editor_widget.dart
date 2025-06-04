@@ -27,15 +27,10 @@ class EditorWidget extends StatefulWidget {
   final Future Function(Journal updatedJournal, String contentJson) onSave;
   final Future Function() onBack;
   final Future Function() onDelete;
-  final Future Function(
-      {required String title,
-      required String content,
-      required String id})? onPrayer;
-  final Future Function(
-      {required String title,
-      required String content,
-      required String id})? onScripture;
-  final Future Function({required String title, required String id})? onTag;
+  final Future Function({String? title, String? content, String? id})? onPrayer;
+  final Future Function({String? title, String? content, String? id})?
+      onScripture;
+  final Future Function({String? title, String? id})? onTag;
 
   @override
   State<EditorWidget> createState() => _EditorWidgetState();
