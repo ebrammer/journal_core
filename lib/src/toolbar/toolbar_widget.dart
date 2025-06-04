@@ -22,6 +22,9 @@ class JournalToolbar extends StatefulWidget {
     this.onDocumentChanged, // Callback for document changes
     this.onMoveUp,
     this.onMoveDown,
+    this.onPrayer,
+    this.onScripture,
+    this.onTag,
   });
 
   final EditorState editorState;
@@ -31,6 +34,15 @@ class JournalToolbar extends StatefulWidget {
   final VoidCallback? onDocumentChanged;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
+  final Future Function(
+      {required String title,
+      required String content,
+      required String id})? onPrayer;
+  final Future Function(
+      {required String title,
+      required String content,
+      required String id})? onScripture;
+  final Future Function({required String title, required String id})? onTag;
 
   @override
   State<JournalToolbar> createState() => _JournalToolbarState();
@@ -171,18 +183,47 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         ),
                       if (toolbarState.hasClipboardContent)
                         const SizedBox(width: 8),
-                      // _buildInsertPill(
-                      //   icon: JournalIcons.jfire,
-                      //   label: 'Prayer',
-                      //   onTap: () => _actions.handleInsertPrayer(),
-                      // ),
-                      // const SizedBox(width: 8),
-                      // _buildInsertPill(
-                      //   icon: JournalIcons.jbibleregular,
-                      //   label: 'Scripture',
-                      //   onTap: () => _actions.handleInsertScripture(),
-                      // ),
-                      // const SizedBox(width: 8),
+                      _buildInsertPill(
+                        icon: JournalIcons.jfire,
+                        label: 'Prayer',
+                        onTap: () async {
+                          if (widget.onPrayer != null) {
+                            await widget.onPrayer!(
+                              title: '',
+                              content: '',
+                              id: '',
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildInsertPill(
+                        icon: JournalIcons.jbibleregular,
+                        label: 'Scripture',
+                        onTap: () async {
+                          if (widget.onScripture != null) {
+                            await widget.onScripture!(
+                              title: '',
+                              content: '',
+                              id: '',
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildInsertPill(
+                        icon: JournalIcons.jtag,
+                        label: 'Tag',
+                        onTap: () async {
+                          if (widget.onTag != null) {
+                            await widget.onTag!(
+                              title: '',
+                              id: '',
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 8),
                       _buildInsertPill(
                         icon: JournalIcons.jminus,
                         label: 'Divider',

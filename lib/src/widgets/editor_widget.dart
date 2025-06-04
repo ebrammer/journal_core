@@ -18,12 +18,24 @@ class EditorWidget extends StatefulWidget {
     required this.onSave,
     required this.onBack,
     required this.onDelete,
+    this.onPrayer,
+    this.onScripture,
+    this.onTag,
   });
 
   final Journal journal;
   final Future Function(Journal updatedJournal, String contentJson) onSave;
   final Future Function() onBack;
   final Future Function() onDelete;
+  final Future Function(
+      {required String title,
+      required String content,
+      required String id})? onPrayer;
+  final Future Function(
+      {required String title,
+      required String content,
+      required String id})? onScripture;
+  final Future Function({required String title, required String id})? onTag;
 
   @override
   State<EditorWidget> createState() => _EditorWidgetState();
@@ -561,6 +573,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                             .moveBlock(_selectedBlockPath![0], 1);
                       }
                     },
+                    onPrayer: widget.onPrayer,
+                    onScripture: widget.onScripture,
+                    onTag: widget.onTag,
                   ),
                 ],
               ),
