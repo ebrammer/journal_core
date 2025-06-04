@@ -184,6 +184,16 @@ class ToolbarButtons {
         isActive: () =>
             toolbarState.currentBlockType == BlockTypeConstants.divider,
       ),
+      // ToolbarButtonConfig(
+      //   key: 'prayer',
+      //   icon: JournalIcons.jprayer,
+      //   onPressed: () => actions.handleInsertPrayer(),
+      // ),
+      // ToolbarButtonConfig(
+      //   key: 'scripture',
+      //   icon: JournalIcons.jscripture,
+      //   onPressed: () => actions.handleInsertScripture(),
+      // ),
     ];
   }
 
@@ -213,6 +223,11 @@ class ToolbarButtons {
         onPressed: () => actions.handleToggleStyle('strikethrough'),
         isActive: () => toolbarState.isStyleStrikethrough,
       ),
+      ToolbarButtonConfig(
+        key: 'copy',
+        icon: JournalIcons.jcopy,
+        onPressed: () => actions.handleCopyToClipboard(),
+      ),
     ];
   }
 
@@ -222,7 +237,28 @@ class ToolbarButtons {
         toolbarState.currentSelectionPath!.length == 1 &&
         toolbarState.currentSelectionPath![0] == 0;
 
-    return [
+    // Count valid blocks (excluding metadata and spacer blocks)
+    int validBlockCount = 0;
+    for (final node in editorState.document.root.children) {
+      if (node != null &&
+          node.type != 'spacer_block' &&
+          node.type != 'metadata_block') {
+        validBlockCount++;
+      }
+    }
+
+    final buttons = <ToolbarButtonConfig>[];
+
+    // Only add delete button if there's more than one block
+    if (validBlockCount > 1) {
+      buttons.add(ToolbarButtonConfig(
+        key: 'delete',
+        icon: JournalIcons.jxCircle,
+        onPressed: () => actions.handleDelete(),
+      ));
+    }
+
+    buttons.addAll([
       ToolbarButtonConfig(
         key: 'move_up',
         icon: JournalIcons.jarrowLineUp,
@@ -233,7 +269,9 @@ class ToolbarButtons {
         icon: JournalIcons.jarrowLineDown,
         onPressed: onMoveDown,
       ),
-    ];
+    ]);
+
+    return buttons;
   }
 
   IconData _getHeadingIcon() {

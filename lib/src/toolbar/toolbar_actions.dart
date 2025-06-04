@@ -1,10 +1,12 @@
 // lib/src/toolbar/toolbar_actions.dart
 
 import 'package:flutter/material.dart'; // For FocusNode
+import 'package:flutter/services.dart'; // For Clipboard
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:journal_core/src/blocks/divider_block.dart' as divider;
 import '../models/block_type_constants.dart';
+import 'package:flutter/rendering.dart';
 
 /// Manages toolbar actions for the journal editor, including formatting and insertion.
 /// - Includes debug logs with 🔍 prefix for actions.
@@ -566,6 +568,40 @@ class ToolbarActions {
 
     if (hadFocus && focusNode != null) {
       focusNode!.requestFocus();
+    }
+  }
+
+  void handleCopyToClipboard() {
+    final selection = editorState.selection;
+    if (selection == null || selection.isCollapsed) return;
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) return;
+
+    final delta = node.attributes['delta'] as List? ?? [];
+    if (delta.isEmpty) return;
+
+    final startOffset = selection.start.offset;
+    final endOffset = selection.end.offset;
+    var currentOffset = 0;
+    final selectedText = StringBuffer();
+
+    for (final op in delta) {
+      final opText = op['insert'] as String;
+      final opLength = opText.length;
+      if (currentOffset + opLength > startOffset && currentOffset < endOffset) {
+        final selectionStart = startOffset - currentOffset;
+        final selectionEnd = endOffset - currentOffset;
+        selectedText.write(opText.substring(
+          selectionStart.clamp(0, opLength),
+          selectionEnd.clamp(0, opLength),
+        ));
+      }
+      currentOffset += opLength;
+    }
+
+    if (selectedText.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: selectedText.toString()));
+      toolbarState.hasClipboardContent = true;
     }
   }
 }

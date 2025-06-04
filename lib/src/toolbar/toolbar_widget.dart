@@ -89,6 +89,60 @@ class _JournalToolbarState extends State<JournalToolbar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Insert Menu
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.only(top: 0, bottom: 8.0),
+              decoration: const BoxDecoration(
+                color: Colors.transparent,
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(width: 12.0),
+                    _buildInsertPill(
+                      icon: JournalIcons.jrowsPlusTop,
+                      label: 'Insert Above',
+                      onTap: () => _actions.handleInsertAbove(),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildInsertPill(
+                      icon: JournalIcons.jrowsPlusBottom,
+                      label: 'Insert Below',
+                      onTap: () => _actions.handleInsertBelow(),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildInsertPill(
+                      icon: JournalIcons.jminus,
+                      label: 'Divider',
+                      onTap: () => _actions.handleInsertDivider(),
+                      isActive: toolbarState.currentBlockType ==
+                          BlockTypeConstants.divider,
+                    ),
+                    // const SizedBox(width: 8),
+                    // _buildInsertPill(
+                    //   icon: JournalIcons.jfire,
+                    //   label: 'Prayer',
+                    //   onTap: () => actions.handleInsertPrayer(),
+                    // ),
+                    // const SizedBox(width: 8),
+                    // _buildInsertPill(
+                    //   icon: JournalIcons.jbibleregular,
+                    //   label: 'Scripture',
+                    //   onTap: () => actions.handleInsertScripture(),
+                    // ),
+                    const SizedBox(width: 12.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Main Toolbar
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4.0),
             decoration: BoxDecoration(
@@ -324,6 +378,49 @@ class _JournalToolbarState extends State<JournalToolbar> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildInsertPill({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+        decoration: BoxDecoration(
+          color: isActive ? theme.secondaryBackground : theme.toolbarBackground,
+          borderRadius: BorderRadius.circular(999.0),
+          border: Border.all(
+            color: isActive
+                ? theme.toolbarBorder
+                : theme.toolbarBorder.withAlpha(128),
+            width: 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14.0,
+              color: theme.primaryText,
+            ),
+            const SizedBox(width: 4.0),
+            Text(
+              label,
+              style: TextStyle(
+                color: theme.primaryText,
+                fontSize: 12.0,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
