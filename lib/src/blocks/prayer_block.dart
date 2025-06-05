@@ -133,14 +133,12 @@ class PrayerBlockComponentWidget extends StatelessWidget
       }
     }
 
+    final theme = JournalEditorTheme.blockThemes[PrayerBlockKeys.type]!;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       margin: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDF9F2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFEADBC0), width: 1),
-      ),
+      decoration: theme.decoration,
       child: Row(
         children: [
           const Icon(Icons.local_fire_department_rounded, size: 18),
@@ -148,12 +146,9 @@ class PrayerBlockComponentWidget extends StatelessWidget
           Expanded(
             child: Text(
               title.isNotEmpty ? title : 'Prayer',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                overflow: TextOverflow.ellipsis,
-              ),
+              style: theme.boldTextStyle,
               maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

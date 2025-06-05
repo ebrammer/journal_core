@@ -17,6 +17,8 @@ class ToolbarState extends ChangeNotifier {
   bool isStyleItalic = false;
   bool isStyleUnderline = false;
   bool isStyleStrikethrough = false;
+  bool isStyleBackgroundColor = false;
+  bool isStyleTextColor = false;
   bool hasClipboardContent = false;
   List<int>? currentSelectionPath;
   String? previousSiblingType;
@@ -37,15 +39,26 @@ class ToolbarState extends ChangeNotifier {
     required bool italic,
     required bool underline,
     required bool strikethrough,
+    bool? backgroundColor,
+    bool? textColor,
   }) {
     if (isStyleBold != bold ||
         isStyleItalic != italic ||
         isStyleUnderline != underline ||
-        isStyleStrikethrough != strikethrough) {
+        isStyleStrikethrough != strikethrough ||
+        (backgroundColor != null &&
+            isStyleBackgroundColor != backgroundColor) ||
+        (textColor != null && isStyleTextColor != textColor)) {
       isStyleBold = bold;
       isStyleItalic = italic;
       isStyleUnderline = underline;
       isStyleStrikethrough = strikethrough;
+      if (backgroundColor != null) {
+        isStyleBackgroundColor = backgroundColor;
+      }
+      if (textColor != null) {
+        isStyleTextColor = textColor;
+      }
       notifyListeners();
     }
   }

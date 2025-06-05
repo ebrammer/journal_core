@@ -52,6 +52,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
     _actions = ToolbarActions(
       editorState: widget.editorState,
       toolbarState: widget.controller.toolbarState,
+      context: context,
       focusNode: widget.focusNode,
       onDocumentChanged: widget.onDocumentChanged, // Pass to ToolbarActions
     );
@@ -59,6 +60,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
       editorState: widget.editorState,
       toolbarState: widget.controller.toolbarState,
       actions: _actions,
+      context: context,
       focusNode: widget.focusNode,
       onMoveUp: widget.onMoveUp,
       onMoveDown: widget.onMoveDown,
@@ -177,36 +179,36 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         ),
                       if (toolbarState.hasClipboardContent)
                         const SizedBox(width: 8),
-                      _buildInsertPill(
-                        icon: JournalIcons.jfire,
-                        label: 'Prayer',
-                        onTap: () async {
-                          if (widget.onPrayer != null) {
-                            await widget.onPrayer!();
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildInsertPill(
-                        icon: JournalIcons.jbibleregular,
-                        label: 'Scripture',
-                        onTap: () async {
-                          if (widget.onScripture != null) {
-                            await widget.onScripture!();
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildInsertPill(
-                        icon: JournalIcons.jtag,
-                        label: 'Tag',
-                        onTap: () async {
-                          if (widget.onTag != null) {
-                            await widget.onTag!();
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
+                      // _buildInsertPill(
+                      //   icon: JournalIcons.jfire,
+                      //   label: 'Prayer',
+                      //   onTap: () async {
+                      //     if (widget.onPrayer != null) {
+                      //       await widget.onPrayer!();
+                      //     }
+                      //   },
+                      // ),
+                      // const SizedBox(width: 8),
+                      // _buildInsertPill(
+                      //   icon: JournalIcons.jbibleregular,
+                      //   label: 'Scripture',
+                      //   onTap: () async {
+                      //     if (widget.onScripture != null) {
+                      //       await widget.onScripture!();
+                      //     }
+                      //   },
+                      // ),
+                      // const SizedBox(width: 8),
+                      // _buildInsertPill(
+                      //   icon: JournalIcons.jtag,
+                      //   label: 'Tag',
+                      //   onTap: () async {
+                      //     if (widget.onTag != null) {
+                      //       await widget.onTag!();
+                      //     }
+                      //   },
+                      // ),
+                      // const SizedBox(width: 8),
                       _buildInsertPill(
                         icon: JournalIcons.jminus,
                         label: 'Divider',

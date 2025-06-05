@@ -119,14 +119,12 @@ class ScriptureBlockComponentWidget extends StatelessWidget
 
   @override
   Widget build(BuildContext context) {
+    final theme = JournalEditorTheme.blockThemes[ScriptureBlockKeys.type]!;
+
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F4F9),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFD8D8E0), width: 1),
-      ),
+      decoration: theme.decoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: node.children.map((child) {

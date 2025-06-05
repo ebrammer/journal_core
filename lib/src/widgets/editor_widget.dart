@@ -4,12 +4,20 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
-import 'package:journal_core/src/utils/focus_helpers.dart';
-import 'package:journal_core/src/blocks/divider_block.dart' as divider;
-import '../theme/journal_theme.dart';
-import '../editor/editor_globals.dart';
+import '../editor/editor_globals.dart' as globals;
 import '../models/block_type_constants.dart';
 import '../models/journal.dart';
+import '../theme/journal_theme.dart';
+import '../toolbar/toolbar_state.dart';
+import '../toolbar/toolbar_widget.dart';
+import '../utils/logging.dart';
+import 'package:journal_core/src/utils/focus_helpers.dart';
+import 'package:journal_core/src/blocks/divider_block.dart' as divider;
+import '../models/journal.dart';
+import '../editor/journal_editor_controller.dart';
+import '../toolbar/toolbar_state.dart';
+import '../toolbar/toolbar_widget.dart';
+import '../utils/logging.dart';
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
@@ -124,10 +132,10 @@ class _EditorWidgetState extends State<EditorWidget> {
           ),
         );
         _editorState = EditorState(document: fixedDocument);
-        EditorGlobals.editorState = _editorState;
+        globals.EditorGlobals.editorState = _editorState;
       } else {
         _editorState = EditorState(document: document);
-        EditorGlobals.editorState = _editorState;
+        globals.EditorGlobals.editorState = _editorState;
       }
 
       // Add metadata and spacer blocks if they don't exist
@@ -244,7 +252,7 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   void dispose() {
-    EditorGlobals.editorState = null; // Clear the global editor state
+    globals.EditorGlobals.editorState = null; // Clear the global editor state
     _editorState.selectionNotifier.removeListener(_onSelectionChanged);
     _titleFocusNode.dispose();
     _focusNode.dispose();
@@ -523,6 +531,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                                     color: theme.primaryText,
                                   ),
                                 ),
+                                textSpanDecorator: globals
+                                    .defaultTextSpanDecoratorForAttribute,
                               ),
                             ),
                           );

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:intl/intl.dart';
+import '../editor/editor_globals.dart';
 
 /// Constants for identifying a date block
 class DateBlockKeys {
@@ -83,17 +84,14 @@ class DateBlockComponentWidget extends StatelessWidget
   Widget build(BuildContext context) {
     final delta = node.attributes['delta'] as List?;
     final text = delta?.isNotEmpty == true ? delta![0]['insert'] as String : '';
+    final theme = JournalEditorTheme.blockThemes[DateBlockKeys.type]!;
 
     return Container(
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: Color(0xFF888888),
-        ),
+        style: theme.textStyle,
       ),
     );
   }

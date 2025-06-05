@@ -33,11 +33,13 @@ class ToolbarButtons {
   final FocusNode? focusNode;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
+  final BuildContext context;
 
   ToolbarButtons({
     required this.editorState,
     required this.toolbarState,
     required this.actions,
+    required this.context,
     this.focusNode,
     this.onMoveUp,
     this.onMoveDown,
@@ -253,6 +255,12 @@ class ToolbarButtons {
         icon: JournalIcons.jtextStrikethrough,
         onPressed: () => actions.handleToggleStyle('strikethrough'),
         isActive: () => toolbarState.isStyleStrikethrough,
+      ),
+      ToolbarButtonConfig(
+        key: 'color_sheet',
+        icon: JournalIcons.jtextAUnderline,
+        onPressed: () => actions.showColorBottomSheet(),
+        isActive: () => false,
       ),
     ];
   }

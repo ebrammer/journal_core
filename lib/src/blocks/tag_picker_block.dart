@@ -82,17 +82,15 @@ class TagPickerBlockComponentWidget extends StatelessWidget
 
   @override
   Widget build(BuildContext context) {
+    final theme = JournalEditorTheme.blockThemes[TagPickerBlockKeys.type]!;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF2FF),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFB9D4FF), width: 1),
-      ),
-      child: const Text(
+      decoration: theme.decoration,
+      child: Text(
         'Tag Picker (placeholder)',
-        style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+        style: theme.textStyle.copyWith(fontStyle: FontStyle.italic),
       ),
     );
   }
