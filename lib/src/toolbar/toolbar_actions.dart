@@ -24,22 +24,21 @@ class ToolbarActions {
 
   // Theme-aware color pairs (light, dark)
   static const List<(Color, Color)> textColorPairs = [
-    (Color(0xFF000000), Color(0xFFFFFFFF)), // black/white for reset
-    (Color(0xFF3B82F6), Color(0xFF3B82F6)), // blue-500
-    (Color(0xFF22C55E), Color(0xFF22C55E)), // green-500
+    (Colors.black, Colors.white), // black/white
+    (Color(0xFF0EA5E9), Color(0xFF0EA5E9)), // blue-500
+    (Color(0xFF84CC16), Color(0xFF84CC16)), // green-500
     (Color(0xFFF97316), Color(0xFFF97316)), // orange-500
-    (Color(0xFFA855F7), Color(0xFFA855F7)), // purple-500
     (Color(0xFFD946EF), Color(0xFFD946EF)), // fuchsia-500
+    (Color(0xFF78716C), Color(0xFF78716C)), // gray-500
   ];
 
   // Theme-aware background color pairs (light, dark)
   static const List<(Color, Color)> bgColorPairs = [
-    (Color(0xFFF5F5F4), Color(0xFF57534E)), // stone-100, stone-600
-    (Color(0xFFDBEAFE), Color(0xFF2563EB)), // blue-100, blue-600
-    (Color(0xFFDCFCE7), Color(0xFF16A34A)), // green-100, green-600
-    (Color(0xFFFFEDD5), Color(0xFFEA580C)), // orange-100, orange-600
-    (Color(0xFFF3E8FF), Color(0xFF9333EA)), // purple-100, purple-600
-    (Color(0xFFFAE8FF), Color(0xFFC026D3)), // fuchsia-100, fuchsia-600
+    (Color(0xFFE7E5E4), Color(0xFF57534E)), // gray-100/600
+    (Color(0xFF93C5FD), Color(0xFF2563EB)), // blue-300/600
+    (Color(0xFFBEF264), Color(0xFF65A30D)), // green-300/600
+    (Color(0xFFFDBA74), Color(0xFFCA8A04)), // orange-300/500
+    (Color(0xFFF0ABFC), Color(0xFFC026D3)), // fuchsia-300/600
   ];
 
   ToolbarActions({
@@ -927,7 +926,6 @@ class ToolbarActions {
   }
 
   PersistentBottomSheetController? _colorBottomSheetController;
-
   void showColorBottomSheet() {
     print('ToolbarActions: Opening persistent color bottom sheet');
     final scaffold = Scaffold.of(context);
@@ -958,55 +956,60 @@ class ToolbarActions {
     editorState.selectionNotifier.addListener(selectionListener);
 
     _colorBottomSheetController = scaffold.showBottomSheet(
-      (context) => StreamBuilder(
-        stream: Stream.periodic(const Duration(milliseconds: 100)),
-        builder: (context, snapshot) {
-          return _ColorPickerBottomSheet(
-            onTextColorChanged: (color) {
-              // Use saved selection
-              if (savedSelection != null) {
-                setTextColor(color);
-                // Restore selection after color change
-                editorState.selection = savedSelection;
-                if (hadFocus && focusNode != null) {
-                  focusNode!.requestFocus();
+      (context) => SafeArea(
+        bottom: true,
+        child: StreamBuilder(
+          stream: Stream.periodic(const Duration(milliseconds: 100)),
+          builder: (context, snapshot) {
+            return _ColorPickerBottomSheet(
+              onTextColorChanged: (color) {
+                // Use saved selection
+                if (savedSelection != null) {
+                  setTextColor(color);
+                  // Restore selection after color change
+                  editorState.selection = savedSelection;
+                  if (hadFocus && focusNode != null) {
+                    focusNode!.requestFocus();
+                  }
+                  // Close the bottom sheet after color selection
+                  _colorBottomSheetController?.close();
+                  _colorBottomSheetController = null;
+                  editorState.selectionNotifier
+                      .removeListener(selectionListener);
                 }
-                // Close the bottom sheet after color selection
+              },
+              onBackgroundColorChanged: (color) {
+                // Use saved selection
+                if (savedSelection != null) {
+                  setBackgroundColor(color);
+                  // Restore selection after color change
+                  editorState.selection = savedSelection;
+                  if (hadFocus && focusNode != null) {
+                    focusNode!.requestFocus();
+                  }
+                  // Close the bottom sheet after color selection
+                  _colorBottomSheetController?.close();
+                  _colorBottomSheetController = null;
+                  editorState.selectionNotifier
+                      .removeListener(selectionListener);
+                }
+              },
+              onDone: () {
+                // Restore selection when closing without color change
+                if (savedSelection != null) {
+                  editorState.selection = savedSelection;
+                  if (hadFocus && focusNode != null) {
+                    focusNode!.requestFocus();
+                  }
+                }
                 _colorBottomSheetController?.close();
                 _colorBottomSheetController = null;
                 editorState.selectionNotifier.removeListener(selectionListener);
-              }
-            },
-            onBackgroundColorChanged: (color) {
-              // Use saved selection
-              if (savedSelection != null) {
-                setBackgroundColor(color);
-                // Restore selection after color change
-                editorState.selection = savedSelection;
-                if (hadFocus && focusNode != null) {
-                  focusNode!.requestFocus();
-                }
-                // Close the bottom sheet after color selection
-                _colorBottomSheetController?.close();
-                _colorBottomSheetController = null;
-                editorState.selectionNotifier.removeListener(selectionListener);
-              }
-            },
-            onDone: () {
-              // Restore selection when closing without color change
-              if (savedSelection != null) {
-                editorState.selection = savedSelection;
-                if (hadFocus && focusNode != null) {
-                  focusNode!.requestFocus();
-                }
-              }
-              _colorBottomSheetController?.close();
-              _colorBottomSheetController = null;
-              editorState.selectionNotifier.removeListener(selectionListener);
-            },
-            editorState: editorState,
-          );
-        },
+              },
+              editorState: editorState,
+            );
+          },
+        ),
       ),
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -1320,7 +1323,9 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
     if (!selection.isCollapsed) {
       final startOffset = selection.start.offset;
       final endOffset = selection.end.offset;
+      bool foundTextColor = false;
       bool foundBgColor = false;
+      Color? lastTextColor;
       Color? lastBgColor;
 
       for (final op in delta) {
@@ -1330,6 +1335,12 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
 
         if (currentOffset + opLength > startOffset &&
             currentOffset < endOffset) {
+          if (opAttributes['color'] != null) {
+            final color =
+                Color(int.parse(opAttributes['color'] as String, radix: 16));
+            lastTextColor = color;
+            foundTextColor = true;
+          }
           if (opAttributes['backgroundColor'] != null) {
             final color = Color(int.parse(
                 opAttributes['backgroundColor'] as String,
@@ -1339,6 +1350,19 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
           }
         }
         currentOffset += opLength;
+      }
+
+      if (foundTextColor && lastTextColor != null) {
+        // Find the matching color pair
+        for (int i = 0; i < ToolbarActions.textColorPairs.length; i++) {
+          if (ToolbarActions.textColorPairs[i].$1 == lastTextColor ||
+              ToolbarActions.textColorPairs[i].$2 == lastTextColor) {
+            setState(() => selectedTextColor = i);
+            break;
+          }
+        }
+      } else {
+        setState(() => selectedTextColor = 0);
       }
 
       if (foundBgColor && lastBgColor != null) {
@@ -1377,7 +1401,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
             }
           }
         } else {
-          setState(() => selectedTextColor = 0); // Default to black/white
+          setState(() => selectedTextColor = 0);
         }
 
         // Update background color
@@ -1393,7 +1417,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
             }
           }
         } else {
-          setState(() => selectedBgColor = -1); // No background color
+          setState(() => selectedBgColor = -1);
         }
         break;
       }
@@ -1404,9 +1428,6 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
-
-    // Get the current theme's colors
     final currentTextColors = ToolbarActions.textColorPairs
         .map((pair) => isDarkMode ? pair.$2 : pair.$1)
         .toList();
@@ -1414,136 +1435,132 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
         .map((pair) => isDarkMode ? pair.$2 : pair.$1)
         .toList();
 
-    return Material(
-      color: theme.primaryBackground,
-      elevation: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.primaryBackground,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              spreadRadius: 0,
-              offset: const Offset(0, -5),
-            ),
-          ],
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode
+            ? const Color(0xFF3D3D3D)
+            : const Color.fromARGB(255, 255, 255, 255),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          top: BorderSide(
+            color: isDarkMode
+                ? Colors.white.withAlpha(26)
+                : Colors.black.withAlpha(26),
+            width: 0.5,
+          ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding:
-                const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Color',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.titleLarge?.color,
+      ),
+      child: SafeArea(
+        bottom: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Black/white reset
+                  _ColorOption(
+                    color: currentTextColors[0],
+                    label: 'A',
+                    selected: selectedTextColor == 0,
+                    onTap: () {
+                      setState(() => selectedTextColor = 0);
+                      widget.onTextColorChanged(Colors.transparent);
+                    },
+                  ),
+                  // Gray text color
+                  _ColorOption(
+                    color: const Color(0xFF6B7280),
+                    label: 'A',
+                    selected: selectedTextColor == 5,
+                    onTap: () {
+                      setState(() => selectedTextColor = 5);
+                      widget.onTextColorChanged(const Color(0xFF6B7280));
+                    },
+                  ),
+                  // Blue
+                  _ColorOption(
+                    color: currentTextColors[1],
+                    label: 'A',
+                    selected: selectedTextColor == 1,
+                    onTap: () {
+                      setState(() => selectedTextColor = 1);
+                      widget.onTextColorChanged(currentTextColors[1]);
+                    },
+                  ),
+                  // Green
+                  _ColorOption(
+                    color: currentTextColors[2],
+                    label: 'A',
+                    selected: selectedTextColor == 2,
+                    onTap: () {
+                      setState(() => selectedTextColor = 2);
+                      widget.onTextColorChanged(currentTextColors[2]);
+                    },
+                  ),
+                  // Orange
+                  _ColorOption(
+                    color: currentTextColors[3],
+                    label: 'A',
+                    selected: selectedTextColor == 3,
+                    onTap: () {
+                      setState(() => selectedTextColor = 3);
+                      widget.onTextColorChanged(currentTextColors[3]);
+                    },
+                  ),
+                  // Fuchsia
+                  _ColorOption(
+                    color: currentTextColors[4],
+                    label: 'A',
+                    selected: selectedTextColor == 4,
+                    onTap: () {
+                      setState(() => selectedTextColor = 4);
+                      widget.onTextColorChanged(currentTextColors[4]);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Background reset button
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => selectedBgColor = -1);
+                      widget.onBackgroundColorChanged(Colors.transparent);
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: selectedBgColor == -1
+                              ? (isDarkMode ? Colors.white : Colors.black)
+                              : Theme.of(context).dividerColor.withAlpha(26),
+                          width: selectedBgColor == -1 ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: widget.onDone,
-                      child: Text(
-                        'Done',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                      child: Center(
+                        child: Icon(
+                          Icons.format_color_reset,
+                          color: selectedBgColor == -1
+                              ? (isDarkMode ? Colors.white : Colors.black)
+                              : Theme.of(context).dividerColor.withAlpha(128),
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: Theme.of(context).dividerColor.withOpacity(0.1),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Text Color',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        if (selectedTextColor == 0) {
-                          setState(() => selectedTextColor = 0);
-                          widget.onTextColorChanged(Colors.transparent);
-                        } else {
-                          setState(() => selectedTextColor = 0);
-                          widget.onTextColorChanged(currentTextColors[0]);
-                        }
-                      },
-                      child: Text(
-                        'Reset',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(currentTextColors.length, (i) {
-                    return _ColorOption(
-                      color: currentTextColors[i],
-                      label: 'A',
-                      selected: selectedTextColor == i,
-                      onTap: () {
-                        if (i == 0) {
-                          setState(() => selectedTextColor = 0);
-                          widget.onTextColorChanged(Colors.transparent);
-                        } else {
-                          setState(() => selectedTextColor = i);
-                          widget.onTextColorChanged(currentTextColors[i]);
-                        }
-                      },
-                    );
-                  }),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Background Color',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() => selectedBgColor = -1);
-                        widget.onBackgroundColorChanged(Colors.transparent);
-                      },
-                      child: Text(
-                        'Reset',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(currentBgColors.length, (i) {
+                  ),
+                  ...List.generate(currentBgColors.length, (i) {
                     return _ColorOption(
                       color: currentBgColors[i],
                       label: 'A',
@@ -1555,11 +1572,11 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                       },
                     );
                   }),
-                ),
-                const SizedBox(height: 16),
-              ],
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );
@@ -1584,6 +1601,7 @@ class _ColorOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1593,19 +1611,22 @@ class _ColorOption extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border.all(
             color: selected
-                ? Colors.black
+                ? (isDarkMode ? Colors.white : Colors.black)
                 : (isBackground
                     ? color
-                    : Theme.of(context).dividerColor.withOpacity(0.1)),
+                    : Theme.of(context).dividerColor.withAlpha(26)),
             width: selected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
           color: isBackground ? color : Colors.transparent,
         ),
-        child: isBackground
-            ? null
-            : Center(
-                child: Text(
+        child: Center(
+          child: selected
+              ? Icon(Icons.check,
+                  color: isBackground
+                      ? (isDarkMode ? Colors.white : Colors.black)
+                      : color)
+              : Text(
                   label,
                   style: TextStyle(
                     color: color,
@@ -1613,7 +1634,7 @@ class _ColorOption extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }
