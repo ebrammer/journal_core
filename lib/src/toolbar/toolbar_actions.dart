@@ -1416,148 +1416,156 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
         .map((pair) => isDarkMode ? pair.$2 : pair.$1)
         .toList();
 
+    final backgroundColor = isDarkMode
+        ? const Color(0xFF3D3D3D)
+        : const Color.fromARGB(255, 255, 255, 255);
+
     return Container(
       decoration: BoxDecoration(
-        color: isDarkMode
-            ? const Color(0xFF3D3D3D)
-            : const Color.fromARGB(255, 255, 255, 255),
+        color: backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border(
-          top: BorderSide(
-            color: isDarkMode
-                ? Colors.white.withAlpha(26)
-                : Colors.black.withAlpha(26),
-            width: 0.5,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          border: Border(
+            top: BorderSide(
+              color: isDarkMode
+                  ? Colors.white.withAlpha(26)
+                  : Colors.black.withAlpha(26),
+              width: 0.5,
+            ),
           ),
         ),
-      ),
-      child: SafeArea(
-        bottom: true,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Black/white reset
-                  _ColorOption(
-                    color: currentTextColors[0],
-                    label: 'A',
-                    selected: selectedTextColor == 0,
-                    onTap: () {
-                      setState(() => selectedTextColor = 0);
-                      widget.onTextColorChanged(Colors.transparent);
-                    },
-                  ),
-                  // Yellow
-                  _ColorOption(
-                    color: currentTextColors[1],
-                    label: 'A',
-                    selected: selectedTextColor == 1,
-                    onTap: () {
-                      setState(() => selectedTextColor = 1);
-                      widget.onTextColorChanged(currentTextColors[1]);
-                    },
-                  ),
-                  // Green
-                  _ColorOption(
-                    color: currentTextColors[2],
-                    label: 'A',
-                    selected: selectedTextColor == 2,
-                    onTap: () {
-                      setState(() => selectedTextColor = 2);
-                      widget.onTextColorChanged(currentTextColors[2]);
-                    },
-                  ),
-                  // Blue
-                  _ColorOption(
-                    color: currentTextColors[3],
-                    label: 'A',
-                    selected: selectedTextColor == 3,
-                    onTap: () {
-                      setState(() => selectedTextColor = 3);
-                      widget.onTextColorChanged(currentTextColors[3]);
-                    },
-                  ),
-                  // Purple
-                  _ColorOption(
-                    color: currentTextColors[4],
-                    label: 'A',
-                    selected: selectedTextColor == 4,
-                    onTap: () {
-                      setState(() => selectedTextColor = 4);
-                      widget.onTextColorChanged(currentTextColors[4]);
-                    },
-                  ),
-                  // Red
-                  _ColorOption(
-                    color: currentTextColors[5],
-                    label: 'A',
-                    selected: selectedTextColor == 5,
-                    onTap: () {
-                      setState(() => selectedTextColor = 5);
-                      widget.onTextColorChanged(currentTextColors[5]);
-                    },
-                  ),
-                ],
+        child: SafeArea(
+          bottom: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Black/white reset
+                    _ColorOption(
+                      color: currentTextColors[0],
+                      label: 'A',
+                      selected: selectedTextColor == 0,
+                      onTap: () {
+                        setState(() => selectedTextColor = 0);
+                        widget.onTextColorChanged(Colors.transparent);
+                      },
+                    ),
+                    // Yellow
+                    _ColorOption(
+                      color: currentTextColors[1],
+                      label: 'A',
+                      selected: selectedTextColor == 1,
+                      onTap: () {
+                        setState(() => selectedTextColor = 1);
+                        widget.onTextColorChanged(currentTextColors[1]);
+                      },
+                    ),
+                    // Green
+                    _ColorOption(
+                      color: currentTextColors[2],
+                      label: 'A',
+                      selected: selectedTextColor == 2,
+                      onTap: () {
+                        setState(() => selectedTextColor = 2);
+                        widget.onTextColorChanged(currentTextColors[2]);
+                      },
+                    ),
+                    // Blue
+                    _ColorOption(
+                      color: currentTextColors[3],
+                      label: 'A',
+                      selected: selectedTextColor == 3,
+                      onTap: () {
+                        setState(() => selectedTextColor = 3);
+                        widget.onTextColorChanged(currentTextColors[3]);
+                      },
+                    ),
+                    // Purple
+                    _ColorOption(
+                      color: currentTextColors[4],
+                      label: 'A',
+                      selected: selectedTextColor == 4,
+                      onTap: () {
+                        setState(() => selectedTextColor = 4);
+                        widget.onTextColorChanged(currentTextColors[4]);
+                      },
+                    ),
+                    // Red
+                    _ColorOption(
+                      color: currentTextColors[5],
+                      label: 'A',
+                      selected: selectedTextColor == 5,
+                      onTap: () {
+                        setState(() => selectedTextColor = 5);
+                        widget.onTextColorChanged(currentTextColors[5]);
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Background reset button
-                  GestureDetector(
-                    onTap: () {
-                      setState(() => selectedBgColor = -1);
-                      widget.onBackgroundColorChanged(Colors.transparent);
-                    },
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: selectedBgColor == -1
-                              ? (isDarkMode ? Colors.white : Colors.black)
-                              : Theme.of(context).dividerColor.withAlpha(26),
-                          width: selectedBgColor == -1 ? 2 : 1,
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Background reset button
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => selectedBgColor = -1);
+                        widget.onBackgroundColorChanged(Colors.transparent);
+                      },
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: selectedBgColor == -1
+                                ? (isDarkMode ? Colors.white : Colors.black)
+                                : Theme.of(context).dividerColor.withAlpha(26),
+                            width: selectedBgColor == -1 ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.format_color_reset,
-                          color: selectedBgColor == -1
-                              ? (isDarkMode ? Colors.white : Colors.black)
-                              : Theme.of(context).dividerColor.withAlpha(128),
+                        child: Center(
+                          child: Icon(
+                            Icons.format_color_reset,
+                            color: selectedBgColor == -1
+                                ? (isDarkMode ? Colors.white : Colors.black)
+                                : Theme.of(context).dividerColor.withAlpha(128),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  ...List.generate(currentBgColors.length, (i) {
-                    return _ColorOption(
-                      color: currentBgColors[i],
-                      label: 'A',
-                      selected: selectedBgColor == i,
-                      isBackground: true,
-                      onTap: () {
-                        setState(() => selectedBgColor = i);
-                        widget.onBackgroundColorChanged(currentBgColors[i]);
-                      },
-                    );
-                  }),
-                ],
+                    ...List.generate(currentBgColors.length, (i) {
+                      return _ColorOption(
+                        color: currentBgColors[i],
+                        label: 'A',
+                        selected: selectedBgColor == i,
+                        isBackground: true,
+                        onTap: () {
+                          setState(() => selectedBgColor = i);
+                          widget.onBackgroundColorChanged(currentBgColors[i]);
+                        },
+                      );
+                    }),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
