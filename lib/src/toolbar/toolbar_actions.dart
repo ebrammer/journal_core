@@ -411,21 +411,13 @@ class ToolbarActions {
       focusNode!.requestFocus();
     }
 
-    // Update toolbar state
-    switch (style) {
-      case 'bold':
-        toolbarState.isStyleBold = !toolbarState.isStyleBold;
-        break;
-      case 'italic':
-        toolbarState.isStyleItalic = !toolbarState.isStyleItalic;
-        break;
-      case 'underline':
-        toolbarState.isStyleUnderline = !toolbarState.isStyleUnderline;
-        break;
-      case 'strikethrough':
-        toolbarState.isStyleStrikethrough = !toolbarState.isStyleStrikethrough;
-        break;
-    }
+    // Update toolbar state based on the actual text attributes
+    toolbarState.setTextStyles(
+      bold: isStyleActive('bold'),
+      italic: isStyleActive('italic'),
+      underline: isStyleActive('underline'),
+      strikethrough: isStyleActive('strikethrough'),
+    );
   }
 
   void handleCycleAlignment() {
@@ -870,275 +862,94 @@ class ToolbarActions {
     }
   }
 
-  void handleBackgroundColor() async {
-    print('ToolbarActions: Opening background color picker');
-    final selection = editorState.selection;
-    if (selection == null) {
-      print('ToolbarActions: No selection found');
-      return;
-    }
-    final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) {
-      print('ToolbarActions: No node found at path ${selection.start.path}');
-      return;
-    }
+  PersistentBottomSheetController? _colorBottomSheetController;
 
-    // Save the current selection and focus state
-    final savedSelection = selection;
+  void showColorBottomSheet() {
+    print('ToolbarActions: Opening persistent color bottom sheet');
+    final scaffold = Scaffold.of(context);
+    // Save selection and focus
     final hadFocus = focusNode?.hasFocus ?? false;
+    final savedSelection = editorState.selection;
 
-    final color = await showDialog<Color>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Background Color'),
-        content: SingleChildScrollView(
-          child: BlockPicker(
-            pickerColor: Colors.yellow,
-            onColorChanged: (color) {
-              Navigator.of(context).pop(color);
+    // Hide keyboard using SystemChannels
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+    // Close any existing bottom sheet
+    _colorBottomSheetController?.close();
+    _colorBottomSheetController = null;
+
+    // Add a listener to close the bottom sheet when selection changes
+    void selectionListener() {
+      final currentSelection = editorState.selection;
+      if (currentSelection != null &&
+          (savedSelection == null ||
+              currentSelection.start.path != savedSelection.start.path ||
+              currentSelection.start.offset != savedSelection.start.offset)) {
+        _colorBottomSheetController?.close();
+        _colorBottomSheetController = null;
+        editorState.selectionNotifier.removeListener(selectionListener);
+      }
+    }
+
+    editorState.selectionNotifier.addListener(selectionListener);
+
+    _colorBottomSheetController = scaffold.showBottomSheet(
+      (context) => StreamBuilder(
+        stream: Stream.periodic(const Duration(milliseconds: 100)),
+        builder: (context, snapshot) {
+          return _ColorPickerBottomSheet(
+            onTextColorChanged: (color) {
+              // Use saved selection
+              if (savedSelection != null) {
+                setTextColor(color);
+                // Restore selection after color change
+                editorState.selection = savedSelection;
+                if (hadFocus && focusNode != null) {
+                  focusNode!.requestFocus();
+                }
+                // Close the bottom sheet after color selection
+                _colorBottomSheetController?.close();
+                _colorBottomSheetController = null;
+                editorState.selectionNotifier.removeListener(selectionListener);
+              }
             },
-            availableColors: [
-              Colors.red,
-              Colors.pink,
-              Colors.purple,
-              Colors.deepPurple,
-              Colors.indigo,
-              Colors.blue,
-              Colors.lightBlue,
-              Colors.cyan,
-              Colors.teal,
-              Colors.green,
-              Colors.lightGreen,
-              Colors.lime,
-              Colors.yellow,
-              Colors.amber,
-              Colors.orange,
-              Colors.deepOrange,
-              Colors.brown,
-              Colors.grey,
-              Colors.blueGrey,
-              Colors.black,
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
+            onBackgroundColorChanged: (color) {
+              // Use saved selection
+              if (savedSelection != null) {
+                setBackgroundColor(color);
+                // Restore selection after color change
+                editorState.selection = savedSelection;
+                if (hadFocus && focusNode != null) {
+                  focusNode!.requestFocus();
+                }
+                // Close the bottom sheet after color selection
+                _colorBottomSheetController?.close();
+                _colorBottomSheetController = null;
+                editorState.selectionNotifier.removeListener(selectionListener);
+              }
+            },
+            onDone: () {
+              // Restore selection when closing without color change
+              if (savedSelection != null) {
+                editorState.selection = savedSelection;
+                if (hadFocus && focusNode != null) {
+                  focusNode!.requestFocus();
+                }
+              }
+              _colorBottomSheetController?.close();
+              _colorBottomSheetController = null;
+              editorState.selectionNotifier.removeListener(selectionListener);
+            },
+            editorState: editorState,
+          );
+        },
+      ),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
     );
-
-    // Restore the selection and focus
-    editorState.selection = savedSelection;
-    if (hadFocus && focusNode != null) {
-      focusNode!.requestFocus();
-    }
-
-    if (color == null) {
-      print('ToolbarActions: No color selected');
-      return;
-    }
-
-    print('ToolbarActions: Color selected: ${color.value.toRadixString(16)}');
-    setBackgroundColor(color);
-  }
-
-  void setBackgroundColor(Color color) {
-    print(
-        'ToolbarActions: Setting background color to ${color.value.toRadixString(16)}');
-    final selection = editorState.selection;
-    if (selection == null) {
-      print('ToolbarActions: No selection found');
-      return;
-    }
-
-    final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) {
-      print('ToolbarActions: No node found at path ${selection.start.path}');
-      return;
-    }
-
-    final attributes = node.attributes;
-    final delta = attributes['delta'] as List? ?? [];
-    if (delta.isEmpty) {
-      print('ToolbarActions: Empty delta found');
-      return;
-    }
-
-    print('ToolbarActions: Current delta: $delta');
-    print(
-        'ToolbarActions: Selection range: ${selection.start.offset} to ${selection.end.offset}');
-
-    // Log the selected text
-    final startOffset = selection.start.offset;
-    final endOffset = selection.end.offset;
-    var selectedText = '';
-    var currentOffset = 0;
-    for (final op in delta) {
-      final opText = op['insert'] as String;
-      final opLength = opText.length;
-      print(
-          'ToolbarActions: Processing delta operation: text="$opText", length=$opLength, currentOffset=$currentOffset');
-
-      if (currentOffset + opLength > startOffset && currentOffset < endOffset) {
-        final textStart = startOffset - currentOffset;
-        final textEnd = min(endOffset - currentOffset, opLength);
-        final extractedText = opText.substring(textStart, textEnd);
-        selectedText += extractedText;
-        print(
-            'ToolbarActions: Extracted text from operation: "$extractedText"');
-      }
-      currentOffset += opLength;
-    }
-    print(
-        'ToolbarActions: Final selected text: "$selectedText" (from $startOffset to $endOffset)');
-
-    final transaction = editorState.transaction;
-    final newDelta = <Map<String, dynamic>>[];
-    currentOffset = 0;
-
-    for (final op in delta) {
-      final opText = op['insert'] as String;
-      final opLength = opText.length;
-      final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
-      print(
-          'ToolbarActions: Processing text "$opText" at offset $currentOffset with attributes: $opAttributes');
-
-      if (currentOffset + opLength <= startOffset ||
-          currentOffset >= endOffset) {
-        // Text is outside selection range, keep as is
-        print('ToolbarActions: Text outside selection range, keeping as is');
-        newDelta.add(op);
-      } else {
-        // Text overlaps with selection
-        final beforeSelection =
-            opText.substring(0, startOffset - currentOffset);
-        final selectedText = opText.substring(
-          startOffset - currentOffset,
-          min(endOffset - currentOffset, opLength),
-        );
-        final afterSelection =
-            opText.substring(min(endOffset - currentOffset, opLength));
-
-        print(
-            'ToolbarActions: Splitting text: before="$beforeSelection", selected="$selectedText", after="$afterSelection"');
-
-        // Add text before selection
-        if (beforeSelection.isNotEmpty) {
-          newDelta.add({
-            'insert': beforeSelection,
-            'attributes': Map<String, dynamic>.from(opAttributes),
-          });
-        }
-
-        // Add selected text with background color
-        if (selectedText.isNotEmpty) {
-          final newAttributes = {
-            ...Map<String, dynamic>.from(opAttributes),
-            'backgroundColor': color.value.toRadixString(16).padLeft(8, '0'),
-          };
-          print(
-              'ToolbarActions: Adding selected text with attributes: $newAttributes');
-          newDelta.add({
-            'insert': selectedText,
-            'attributes': newAttributes,
-          });
-        }
-
-        // Add text after selection
-        if (afterSelection.isNotEmpty) {
-          newDelta.add({
-            'insert': afterSelection,
-            'attributes': Map<String, dynamic>.from(opAttributes),
-          });
-        }
-      }
-      currentOffset += opLength;
-    }
-
-    print('ToolbarActions: Final new delta: $newDelta');
-    transaction.updateNode(node, {'delta': newDelta});
-    editorState.apply(transaction);
-
-    // Update toolbar state
-    toolbarState.isStyleBackgroundColor = true;
-  }
-
-  void handleTextColor() async {
-    print('ToolbarActions: Opening text color picker');
-    final selection = editorState.selection;
-    if (selection == null) {
-      print('ToolbarActions: No selection found');
-      return;
-    }
-    final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) {
-      print('ToolbarActions: No node found at path ${selection.start.path}');
-      return;
-    }
-
-    // Save the current selection and focus state
-    final savedSelection = selection;
-    final hadFocus = focusNode?.hasFocus ?? false;
-
-    final color = await showDialog<Color>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Text Color'),
-        content: SingleChildScrollView(
-          child: BlockPicker(
-            pickerColor: Colors.black,
-            onColorChanged: (color) {
-              Navigator.of(context).pop(color);
-            },
-            availableColors: [
-              Colors.red,
-              Colors.pink,
-              Colors.purple,
-              Colors.deepPurple,
-              Colors.indigo,
-              Colors.blue,
-              Colors.lightBlue,
-              Colors.cyan,
-              Colors.teal,
-              Colors.green,
-              Colors.lightGreen,
-              Colors.lime,
-              Colors.yellow,
-              Colors.amber,
-              Colors.orange,
-              Colors.deepOrange,
-              Colors.brown,
-              Colors.grey,
-              Colors.blueGrey,
-              Colors.black,
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    // Restore the selection and focus
-    editorState.selection = savedSelection;
-    if (hadFocus && focusNode != null) {
-      focusNode!.requestFocus();
-    }
-
-    if (color == null) {
-      print('ToolbarActions: No color selected');
-      return;
-    }
-
-    print('ToolbarActions: Color selected: ${color.value.toRadixString(16)}');
-    setTextColor(color);
   }
 
   void setTextColor(Color color) {
@@ -1179,12 +990,14 @@ class ToolbarActions {
           'ToolbarActions: Processing delta operation: text="$opText", length=$opLength, currentOffset=$currentOffset');
 
       if (currentOffset + opLength > startOffset && currentOffset < endOffset) {
-        final textStart = startOffset - currentOffset;
-        final textEnd = min(endOffset - currentOffset, opLength);
-        final extractedText = opText.substring(textStart, textEnd);
-        selectedText += extractedText;
-        print(
-            'ToolbarActions: Extracted text from operation: "$extractedText"');
+        final textStart = max(0, startOffset - currentOffset);
+        final textEnd = min(opLength, endOffset - currentOffset);
+        if (textStart < textEnd) {
+          final extractedText = opText.substring(textStart, textEnd);
+          selectedText += extractedText;
+          print(
+              'ToolbarActions: Extracted text from operation: "$extractedText"');
+        }
       }
       currentOffset += opLength;
     }
@@ -1210,13 +1023,13 @@ class ToolbarActions {
       } else {
         // Text overlaps with selection
         final beforeSelection =
-            opText.substring(0, startOffset - currentOffset);
+            opText.substring(0, max(0, startOffset - currentOffset));
         final selectedText = opText.substring(
-          startOffset - currentOffset,
-          min(endOffset - currentOffset, opLength),
+          max(0, startOffset - currentOffset),
+          min(opLength, endOffset - currentOffset),
         );
         final afterSelection =
-            opText.substring(min(endOffset - currentOffset, opLength));
+            opText.substring(min(opLength, endOffset - currentOffset));
 
         print(
             'ToolbarActions: Splitting text: before="$beforeSelection", selected="$selectedText", after="$afterSelection"');
@@ -1231,10 +1044,19 @@ class ToolbarActions {
 
         // Add selected text with text color
         if (selectedText.isNotEmpty) {
-          final newAttributes = {
-            ...Map<String, dynamic>.from(opAttributes),
-            'color': color.value.toRadixString(16).padLeft(8, '0'),
-          };
+          final newAttributes = Map<String, dynamic>.from(opAttributes);
+          if (color == Colors.transparent) {
+            // When resetting, remove all styling attributes
+            newAttributes.remove('color');
+            newAttributes.remove('backgroundColor');
+            newAttributes.remove('bold');
+            newAttributes.remove('italic');
+            newAttributes.remove('underline');
+            newAttributes.remove('strike');
+          } else {
+            newAttributes['color'] =
+                color.value.toRadixString(16).padLeft(8, '0');
+          }
           print(
               'ToolbarActions: Adding selected text with attributes: $newAttributes');
           newDelta.add({
@@ -1259,70 +1081,140 @@ class ToolbarActions {
     editorState.apply(transaction);
 
     // Update toolbar state
-    toolbarState.isStyleTextColor = true;
+    toolbarState.isStyleTextColor = color != Colors.transparent;
   }
 
-  void showColorBottomSheet() {
-    print('ToolbarActions: Opening persistent color bottom sheet');
-    final scaffold = Scaffold.of(context);
-    // Save selection and focus
-    final hadFocus = focusNode?.hasFocus ?? false;
-    final savedSelection = editorState.selection;
+  void setBackgroundColor(Color color) {
+    print(
+        'ToolbarActions: Setting background color to ${color.value.toRadixString(16)}');
+    final selection = editorState.selection;
+    if (selection == null) {
+      print('ToolbarActions: No selection found');
+      return;
+    }
 
-    // Hide keyboard using SystemChannels
-    SystemChannels.textInput.invokeMethod('TextInput.hide');
+    final transaction = editorState.transaction;
+    final startNode = editorState.getNodeAtPath(selection.start.path);
+    final endNode = editorState.getNodeAtPath(selection.end.path);
 
-    scaffold.showBottomSheet(
-      (context) => StreamBuilder(
-        stream: Stream.periodic(const Duration(milliseconds: 100)),
-        builder: (context, snapshot) {
-          return _ColorPickerBottomSheet(
-            onTextColorChanged: (color) {
-              // Use saved selection
-              if (savedSelection != null) {
-                setTextColor(color);
-                // Restore selection after color change
-                editorState.selection = savedSelection;
-                if (hadFocus && focusNode != null) {
-                  focusNode!.requestFocus();
-                }
-                // Close the bottom sheet after color selection
-                Navigator.of(context).pop();
-              }
-            },
-            onBackgroundColorChanged: (color) {
-              // Use saved selection
-              if (savedSelection != null) {
-                setBackgroundColor(color);
-                // Restore selection after color change
-                editorState.selection = savedSelection;
-                if (hadFocus && focusNode != null) {
-                  focusNode!.requestFocus();
-                }
-                // Close the bottom sheet after color selection
-                Navigator.of(context).pop();
-              }
-            },
-            onDone: () {
-              // Restore selection when closing without color change
-              if (savedSelection != null) {
-                editorState.selection = savedSelection;
-                if (hadFocus && focusNode != null) {
-                  focusNode!.requestFocus();
-                }
-              }
-              Navigator.of(context).pop();
-            },
-            editorState: editorState,
-          );
-        },
-      ),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      elevation: 1,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-    );
+    if (startNode == null || endNode == null) {
+      print('ToolbarActions: Could not find nodes at selection paths');
+      return;
+    }
+
+    // If selection is within a single node
+    if (selection.start.path == selection.end.path) {
+      _applyBackgroundColorToNode(startNode, selection.start.offset,
+          selection.end.offset, color, transaction);
+    } else {
+      // Selection spans multiple nodes
+      final startPath = selection.start.path;
+      final endPath = selection.end.path;
+
+      // Get all nodes between start and end
+      var currentNode = startNode;
+      var currentPath = startPath;
+
+      while (currentPath != endPath) {
+        // Apply color to the current node
+        if (currentPath == startPath) {
+          // For the first node, color from selection start to end of node
+          _applyBackgroundColorToNode(currentNode, selection.start.offset,
+              currentNode.delta?.length ?? 0, color, transaction);
+        } else {
+          // For middle nodes, color the entire node
+          _applyBackgroundColorToNode(currentNode, 0,
+              currentNode.delta?.length ?? 0, color, transaction);
+        }
+
+        // Move to next node
+        final nextIndex = currentPath.last + 1;
+        currentPath = [
+          ...currentPath.sublist(0, currentPath.length - 1),
+          nextIndex
+        ];
+        final nextNode = editorState.getNodeAtPath(currentPath);
+        if (nextNode == null) break;
+        currentNode = nextNode;
+      }
+
+      // Apply color to the last node
+      if (currentNode != null) {
+        _applyBackgroundColorToNode(
+            currentNode, 0, selection.end.offset, color, transaction);
+      }
+    }
+
+    editorState.apply(transaction);
+
+    // Update toolbar state
+    toolbarState.isStyleBackgroundColor = color != Colors.transparent;
+  }
+
+  void _applyBackgroundColorToNode(Node node, int startOffset, int endOffset,
+      Color color, Transaction transaction) {
+    final attributes = node.attributes;
+    final delta = attributes['delta'] as List? ?? [];
+    if (delta.isEmpty) return;
+
+    final newDelta = <Map<String, dynamic>>[];
+    var currentOffset = 0;
+
+    for (final op in delta) {
+      final opText = op['insert'] as String;
+      final opLength = opText.length;
+      final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
+
+      if (currentOffset + opLength <= startOffset ||
+          currentOffset >= endOffset) {
+        // Text is outside selection range, keep as is
+        newDelta.add(op);
+      } else {
+        // Text overlaps with selection
+        final beforeSelection =
+            opText.substring(0, max(0, startOffset - currentOffset));
+        final selectedText = opText.substring(
+          max(0, startOffset - currentOffset),
+          min(opLength, endOffset - currentOffset),
+        );
+        final afterSelection =
+            opText.substring(min(opLength, endOffset - currentOffset));
+
+        // Add text before selection
+        if (beforeSelection.isNotEmpty) {
+          newDelta.add({
+            'insert': beforeSelection,
+            'attributes': Map<String, dynamic>.from(opAttributes),
+          });
+        }
+
+        // Add selected text with background color
+        if (selectedText.isNotEmpty) {
+          final newAttributes = Map<String, dynamic>.from(opAttributes);
+          if (color == Colors.transparent) {
+            newAttributes.remove('backgroundColor');
+          } else {
+            newAttributes['backgroundColor'] =
+                color.value.toRadixString(16).padLeft(8, '0');
+          }
+          newDelta.add({
+            'insert': selectedText,
+            'attributes': newAttributes,
+          });
+        }
+
+        // Add text after selection
+        if (afterSelection.isNotEmpty) {
+          newDelta.add({
+            'insert': afterSelection,
+            'attributes': Map<String, dynamic>.from(opAttributes),
+          });
+        }
+      }
+      currentOffset += opLength;
+    }
+
+    transaction.updateNode(node, {'delta': newDelta});
   }
 }
 
@@ -1378,11 +1270,22 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
 
   late int selectedTextColor;
   late int selectedBgColor;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _updateColorsFromSelection();
+    selectedTextColor = 0;
+    selectedBgColor = -1; // Initialize to -1 to indicate no background color
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _updateColorsFromSelection();
+      _initialized = true;
+    }
   }
 
   void _updateColorsFromSelection() {
@@ -1397,7 +1300,46 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
 
     var currentOffset = 0;
     final cursorOffset = selection.start.offset;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final bgColors = isDarkMode ? darkBgColors : lightBgColors;
 
+    // For non-collapsed selection, check all text in the selection
+    if (!selection.isCollapsed) {
+      final startOffset = selection.start.offset;
+      final endOffset = selection.end.offset;
+      bool foundBgColor = false;
+      Color? lastBgColor;
+
+      for (final op in delta) {
+        final opText = op['insert'] as String;
+        final opLength = opText.length;
+        final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
+
+        if (currentOffset + opLength > startOffset &&
+            currentOffset < endOffset) {
+          if (opAttributes['backgroundColor'] != null) {
+            final color = Color(int.parse(
+                opAttributes['backgroundColor'] as String,
+                radix: 16));
+            lastBgColor = color;
+            foundBgColor = true;
+          }
+        }
+        currentOffset += opLength;
+      }
+
+      if (foundBgColor && lastBgColor != null) {
+        final index = bgColors.indexOf(lastBgColor);
+        if (index != -1) {
+          setState(() => selectedBgColor = index);
+        }
+      } else {
+        setState(() => selectedBgColor = -1);
+      }
+      return;
+    }
+
+    // For collapsed selection, check only at cursor position
     for (final op in delta) {
       final opText = op['insert'] as String;
       final opLength = opText.length;
@@ -1421,14 +1363,12 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
         if (opAttributes['backgroundColor'] != null) {
           final color = Color(
               int.parse(opAttributes['backgroundColor'] as String, radix: 16));
-          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-          final bgColors = isDarkMode ? darkBgColors : lightBgColors;
           final index = bgColors.indexOf(color);
           if (index != -1) {
             setState(() => selectedBgColor = index);
           }
         } else {
-          setState(() => selectedBgColor = 0); // Default to first color
+          setState(() => selectedBgColor = -1); // No background color
         }
         break;
       }
@@ -1438,9 +1378,6 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // Update colors whenever the widget rebuilds
-    _updateColorsFromSelection();
-
     // Create a new list with the first color replaced by the theme's text color
     final themeAwareTextColors = [
       Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
@@ -1451,137 +1388,139 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final bgColors = isDarkMode ? darkBgColors : lightBgColors;
 
-    return SafeArea(
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, -1),
-              ),
-            ],
-          ),
-          padding:
-              const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Color',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).textTheme.titleLarge?.color,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: widget.onDone,
-                    child: Text(
-                      'Done',
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, -1),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding:
+                const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Color',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: widget.onDone,
+                      child: Text(
+                        'Done',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Theme.of(context).dividerColor.withOpacity(0.1),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Text Color',
+                      style: TextStyle(
                         color: Theme.of(context).textTheme.bodyLarge?.color,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: Theme.of(context).dividerColor.withOpacity(0.1),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Text Color',
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    TextButton(
+                      onPressed: () {
+                        setState(() => selectedTextColor = -1);
+                        widget.onTextColorChanged(Colors.black);
+                      },
+                      child: Text(
+                        'Reset',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() => selectedTextColor = -1);
-                      widget.onTextColorChanged(Colors.black);
-                    },
-                    child: Text(
-                      'Reset',
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(textColors.length, (i) {
+                    return _ColorOption(
+                      color: themeAwareTextColors[i],
+                      label: 'A',
+                      selected: selectedTextColor == i,
+                      onTap: () {
+                        setState(() => selectedTextColor = i);
+                        widget.onTextColorChanged(themeAwareTextColors[i]);
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Background Color',
                       style: TextStyle(
-                        fontSize: 14,
                         color: Theme.of(context).textTheme.bodyLarge?.color,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(textColors.length, (i) {
-                  return _ColorOption(
-                    color: themeAwareTextColors[i],
-                    label: 'A',
-                    selected: selectedTextColor == i,
-                    onTap: () {
-                      setState(() => selectedTextColor = i);
-                      widget.onTextColorChanged(themeAwareTextColors[i]);
-                    },
-                  );
-                }),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Background Color',
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() => selectedBgColor = -1);
-                      widget.onBackgroundColorChanged(Colors.transparent);
-                    },
-                    child: Text(
-                      'Reset',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                    TextButton(
+                      onPressed: () {
+                        setState(() => selectedBgColor = -1);
+                        widget.onBackgroundColorChanged(Colors.transparent);
+                      },
+                      child: Text(
+                        'Reset',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(bgColors.length, (i) {
-                  return _ColorOption(
-                    color: bgColors[i],
-                    label: 'A',
-                    selected: selectedBgColor == i,
-                    isBackground: true,
-                    onTap: () {
-                      setState(() => selectedBgColor = i);
-                      widget.onBackgroundColorChanged(bgColors[i]);
-                    },
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-            ],
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(bgColors.length, (i) {
+                    return _ColorOption(
+                      color: bgColors[i],
+                      label: 'A',
+                      selected: selectedBgColor == i,
+                      isBackground: true,
+                      onTap: () {
+                        setState(() => selectedBgColor = i);
+                        widget.onBackgroundColorChanged(bgColors[i]);
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),

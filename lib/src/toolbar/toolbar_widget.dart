@@ -1,10 +1,12 @@
 // lib/src/toolbar/toolbar_widget.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:provider/provider.dart';
 import 'package:journal_core/journal_core.dart';
 import '../theme/journal_theme.dart';
+import 'package:flutter/rendering.dart';
 
 /// The toolbar widget for the journal editor, displaying formatting and reordering options.
 /// - Enhances drag submenu to include move up/down buttons alongside "Long press and drag to reorder" message.
@@ -83,6 +85,9 @@ class _JournalToolbarState extends State<JournalToolbar> {
       Log.info('🔧 Toolbar: Not visible');
       return const SizedBox.shrink();
     }
+
+    // Check clipboard content when toolbar is visible
+    _checkClipboardContent(toolbarState);
 
     final isSubMenu = toolbarState.showTextStyles ||
         toolbarState.showInsertMenu ||
@@ -240,13 +245,12 @@ class _JournalToolbarState extends State<JournalToolbar> {
             padding: const EdgeInsets.symmetric(vertical: 4.0),
             decoration: BoxDecoration(
               color: theme.toolbarBackground,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withAlpha(36),
-                  blurRadius: 14,
-                  offset: const Offset(0, -2),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.grey.withOpacity(0.2),
+                  width: 0.5,
                 ),
-              ],
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -491,5 +495,14 @@ class _JournalToolbarState extends State<JournalToolbar> {
         ),
       ),
     );
+  }
+
+  Future<void> _checkClipboardContent(ToolbarState toolbarState) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final hasContent = data?.text?.isNotEmpty ?? false;
+    if (hasContent != toolbarState.hasClipboardContent) {
+      toolbarState.hasClipboardContent = hasContent;
+      toolbarState.notifyListeners();
+    }
   }
 }
