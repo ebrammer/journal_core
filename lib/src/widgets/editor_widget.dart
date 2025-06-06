@@ -482,6 +482,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                                   onTitleSubmitted: (_) =>
                                       _titleFocusNode.unfocus(),
                                   readOnly: false,
+                                  editorFocusNode: _focusNode,
                                 ),
                                 'date': MetadataBlockBuilder(
                                   titleController:
@@ -492,6 +493,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                                   onTitleEditingComplete: () {},
                                   onTitleSubmitted: (_) {},
                                   readOnly: true,
+                                  editorFocusNode: _focusNode,
                                 ),
                                 'title': MetadataBlockBuilder(
                                   titleController: TextEditingController(

@@ -348,6 +348,10 @@ class ToolbarActions {
     final node = editorState.getNodeAtPath(selection.start.path);
     if (node == null) return;
 
+    // Save the current selection and focus state
+    final savedSelection = selection;
+    final hadFocus = focusNode?.hasFocus ?? false;
+
     final transaction = editorState.transaction;
     final delta = node.delta?.toJson() ??
         [
@@ -400,6 +404,12 @@ class ToolbarActions {
 
     transaction.updateNode(node, {'delta': newDelta});
     editorState.apply(transaction);
+
+    // Restore the selection and focus
+    editorState.selection = savedSelection;
+    if (hadFocus && focusNode != null) {
+      focusNode!.requestFocus();
+    }
 
     // Update toolbar state
     switch (style) {
@@ -480,30 +490,64 @@ class ToolbarActions {
       return;
     }
 
-    List<int>? previousPath;
-    Node? previousNode;
-    if (currentIndex > 0) {
-      previousPath = [...parentPath, currentIndex - 1];
-      previousNode = editorState.getNodeAtPath(previousPath);
-    }
-    if (previousNode == null && currentPath.length > 1) {
-      previousPath = parentPath;
-      previousNode = editorState.getNodeAtPath(parentPath);
-    }
-    if (previousNode == null) {
-      Log.info(
-          '🔍 Indent blocked: No previous sibling or parent at path $currentPath');
-      return;
-    }
-
     final savedSelection = selection;
     final hadFocus = focusNode?.hasFocus ?? false;
 
     final transaction = editorState.transaction;
-    transaction.deleteNode(node);
-    final newPath = [...previousPath!, previousNode.children.length];
-    transaction.insertNode(Path.from(newPath), node);
+
+    // If we're at the root level, create a new parent node
+    if (currentPath.length == 1) {
+      // Create a new parent node of the same type
+      final parentNode = Node(
+        type: node.type,
+        attributes: {
+          'delta': [
+            {'insert': ''}
+          ]
+        },
+        children: [],
+      );
+
+      // Insert the parent node at the current position
+      transaction.insertNode(Path.from([currentIndex]), parentNode);
+
+      // Move the current node to be a child of the new parent
+      transaction.deleteNode(node);
+      transaction.insertNode(Path.from([currentIndex, 0]), node);
+    } else {
+      // Normal indentation logic for nested items
+      List<int>? previousPath;
+      Node? previousNode;
+      if (currentIndex > 0) {
+        previousPath = [...parentPath, currentIndex - 1];
+        previousNode = editorState.getNodeAtPath(previousPath);
+      }
+      if (previousNode == null && currentPath.length > 1) {
+        previousPath = parentPath;
+        previousNode = editorState.getNodeAtPath(parentPath);
+      }
+      if (previousNode == null) {
+        Log.info(
+            '🔍 Indent blocked: No previous sibling or parent at path $currentPath');
+        return;
+      }
+
+      transaction.deleteNode(node);
+      final newPath = [...previousPath!, previousNode.children.length];
+      transaction.insertNode(Path.from(newPath), node);
+    }
+
     editorState.apply(transaction);
+
+    // Update selection to the new position
+    final newPath = currentPath.length == 1
+        ? [currentIndex, 0] // If we created a new parent, select the child
+        : [
+            ...parentPath,
+            currentIndex - 1,
+            0
+          ]; // If we moved to a sibling, select its first child
+
     editorState.selection = Selection.single(
       path: newPath,
       startOffset: savedSelection.start.offset,
@@ -1223,41 +1267,57 @@ class ToolbarActions {
     final scaffold = Scaffold.of(context);
     // Save selection and focus
     final hadFocus = focusNode?.hasFocus ?? false;
+    final savedSelection = editorState.selection;
+
+    // Hide keyboard using SystemChannels
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
 
     scaffold.showBottomSheet(
       (context) => StreamBuilder(
         stream: Stream.periodic(const Duration(milliseconds: 100)),
         builder: (context, snapshot) {
-          final currentSelection = editorState.selection;
           return _ColorPickerBottomSheet(
             onTextColorChanged: (color) {
-              // Use current selection instead of saved selection
-              if (currentSelection != null) {
-                editorState.selection = currentSelection;
+              // Use saved selection
+              if (savedSelection != null) {
+                setTextColor(color);
+                // Restore selection after color change
+                editorState.selection = savedSelection;
                 if (hadFocus && focusNode != null) {
                   focusNode!.requestFocus();
                 }
-                setTextColor(color);
+                // Close the bottom sheet after color selection
+                Navigator.of(context).pop();
               }
             },
             onBackgroundColorChanged: (color) {
-              // Use current selection instead of saved selection
-              if (currentSelection != null) {
-                editorState.selection = currentSelection;
+              // Use saved selection
+              if (savedSelection != null) {
+                setBackgroundColor(color);
+                // Restore selection after color change
+                editorState.selection = savedSelection;
                 if (hadFocus && focusNode != null) {
                   focusNode!.requestFocus();
                 }
-                setBackgroundColor(color);
+                // Close the bottom sheet after color selection
+                Navigator.of(context).pop();
               }
             },
             onDone: () {
+              // Restore selection when closing without color change
+              if (savedSelection != null) {
+                editorState.selection = savedSelection;
+                if (hadFocus && focusNode != null) {
+                  focusNode!.requestFocus();
+                }
+              }
               Navigator.of(context).pop();
             },
             editorState: editorState,
           );
         },
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 1,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1295,22 +1355,25 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
     Color(0xFF9C27B0), // Purple
     Color(0xFFE91E63), // Pink
   ];
-  static const List<Color> bgColors = [
-    // Light colors
+
+  // Light mode background colors
+  static const List<Color> lightBgColors = [
     Color(0xFFF5F5F5), // Light Gray
     Color(0xFFE3F2FD), // Light Blue
     Color(0xFFE8F5E9), // Light Green
     Color(0xFFFFF3E0), // Light Orange
     Color(0xFFF3E5F5), // Light Purple
     Color(0xFFFCE4EC), // Light Pink
+  ];
 
-    // Darker shades
-    Color(0xFFBDBDBD), // Dark Gray
-    Color(0xFF90CAF9), // Dark Blue
-    Color(0xFFA5D6A7), // Dark Green
-    Color(0xFFFFB74D), // Dark Orange
-    Color(0xFFCE93D8), // Dark Purple
-    Color(0xFFF48FB1), // Dark Pink
+  // Dark mode background colors
+  static const List<Color> darkBgColors = [
+    Color(0xFF424242), // Dark Gray
+    Color(0xFF1A237E), // Dark Blue
+    Color(0xFF1B5E20), // Dark Green
+    Color(0xFFE65100), // Dark Orange
+    Color(0xFF4A148C), // Dark Purple
+    Color(0xFF880E4F), // Dark Pink
   ];
 
   late int selectedTextColor;
@@ -1358,12 +1421,14 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
         if (opAttributes['backgroundColor'] != null) {
           final color = Color(
               int.parse(opAttributes['backgroundColor'] as String, radix: 16));
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          final bgColors = isDarkMode ? darkBgColors : lightBgColors;
           final index = bgColors.indexOf(color);
           if (index != -1) {
             setState(() => selectedBgColor = index);
           }
         } else {
-          setState(() => selectedBgColor = 0); // Default to white
+          setState(() => selectedBgColor = 0); // Default to first color
         }
         break;
       }
@@ -1382,156 +1447,142 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
       ...textColors.sublist(1),
     ];
 
+    // Get the appropriate background colors based on theme
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final bgColors = isDarkMode ? darkBgColors : lightBgColors;
+
     return SafeArea(
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, -1),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Color',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).textTheme.titleLarge?.color,
-                  ),
-                ),
-                TextButton(
-                  onPressed: widget.onDone,
-                  child: Text(
-                    'Done',
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, -1),
+              ),
+            ],
+          ),
+          padding:
+              const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Color',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.titleLarge?.color,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: widget.onDone,
+                    child: Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: Theme.of(context).dividerColor.withOpacity(0.1),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Text Color',
+                    style: TextStyle(
                       color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: Theme.of(context).dividerColor.withOpacity(0.1),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Text Color',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  TextButton(
+                    onPressed: () {
+                      setState(() => selectedTextColor = -1);
+                      widget.onTextColorChanged(Colors.black);
+                    },
+                    child: Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() => selectedTextColor = -1);
-                    widget.onTextColorChanged(Colors.black);
-                  },
-                  child: Text(
-                    'Reset',
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(textColors.length, (i) {
+                  return _ColorOption(
+                    color: themeAwareTextColors[i],
+                    label: 'A',
+                    selected: selectedTextColor == i,
+                    onTap: () {
+                      setState(() => selectedTextColor = i);
+                      widget.onTextColorChanged(themeAwareTextColors[i]);
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Background Color',
                     style: TextStyle(
-                      fontSize: 14,
                       color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(textColors.length, (i) {
-                return _ColorOption(
-                  color: themeAwareTextColors[i],
-                  label: 'A',
-                  selected: selectedTextColor == i,
-                  onTap: () {
-                    setState(() => selectedTextColor = i);
-                    widget.onTextColorChanged(themeAwareTextColors[i]);
-                  },
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Background Color',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() => selectedBgColor = -1);
-                    widget.onBackgroundColorChanged(Colors.transparent);
-                  },
-                  child: Text(
-                    'Reset',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                  TextButton(
+                    onPressed: () {
+                      setState(() => selectedBgColor = -1);
+                      widget.onBackgroundColorChanged(Colors.transparent);
+                    },
+                    child: Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            Column(
-              children: [
-                // First row - light colors
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(6, (i) {
-                    return _ColorOption(
-                      color: bgColors[i],
-                      label: 'A',
-                      selected: selectedBgColor == i,
-                      isBackground: true,
-                      onTap: () {
-                        setState(() => selectedBgColor = i);
-                        widget.onBackgroundColorChanged(bgColors[i]);
-                      },
-                    );
-                  }),
-                ),
-                const SizedBox(height: 12),
-                // Second row - darker shades
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(6, (i) {
-                    return _ColorOption(
-                      color: bgColors[i + 6],
-                      label: 'A',
-                      selected: selectedBgColor == i + 6,
-                      isBackground: true,
-                      onTap: () {
-                        setState(() => selectedBgColor = i + 6);
-                        widget.onBackgroundColorChanged(bgColors[i + 6]);
-                      },
-                    );
-                  }),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(bgColors.length, (i) {
+                  return _ColorOption(
+                    color: bgColors[i],
+                    label: 'A',
+                    selected: selectedBgColor == i,
+                    isBackground: true,
+                    onTap: () {
+                      setState(() => selectedBgColor = i);
+                      widget.onBackgroundColorChanged(bgColors[i]);
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );

@@ -17,6 +17,7 @@ class MetadataBlockBuilder extends BlockComponentBuilder {
     this.onTitleEditingComplete,
     this.onTitleSubmitted,
     this.readOnly = false,
+    this.editorFocusNode,
   });
 
   final TextEditingController titleController;
@@ -26,6 +27,7 @@ class MetadataBlockBuilder extends BlockComponentBuilder {
   final VoidCallback? onTitleEditingComplete;
   final ValueChanged<String>? onTitleSubmitted;
   final bool readOnly;
+  final FocusNode? editorFocusNode;
 
   @override
   String get blockType => 'metadata_block';
@@ -42,6 +44,7 @@ class MetadataBlockBuilder extends BlockComponentBuilder {
       onTitleEditingComplete: onTitleEditingComplete,
       onTitleSubmitted: onTitleSubmitted,
       readOnly: readOnly,
+      editorFocusNode: editorFocusNode,
     );
   }
 
@@ -62,6 +65,7 @@ class MetadataBlockWidget extends StatelessWidget
     this.onTitleEditingComplete,
     this.onTitleSubmitted,
     this.readOnly = false,
+    this.editorFocusNode,
   });
 
   @override
@@ -73,6 +77,7 @@ class MetadataBlockWidget extends StatelessWidget
   final VoidCallback? onTitleEditingComplete;
   final ValueChanged<String>? onTitleSubmitted;
   final bool readOnly;
+  final FocusNode? editorFocusNode;
 
   @override
   BlockComponentConfiguration get configuration =>
@@ -143,7 +148,34 @@ class MetadataBlockWidget extends StatelessWidget
               textInputAction: TextInputAction.done,
               onChanged: onTitleChanged,
               onEditingComplete: onTitleEditingComplete,
-              onSubmitted: onTitleSubmitted,
+              onSubmitted: (value) {
+                // Find the first content block (after metadata)
+                final editorState =
+                    Provider.of<EditorState>(context, listen: false);
+                int firstContentIndex = 0;
+                for (int i = 0;
+                    i < editorState.document.root.children.length;
+                    i++) {
+                  if (editorState.document.root.children[i].type !=
+                          BlockTypeConstants.metadata &&
+                      editorState.document.root.children[i].type !=
+                          BlockTypeConstants.spacer) {
+                    firstContentIndex = i;
+                    break;
+                  }
+                }
+
+                // Set selection to the first content block
+                editorState.selection = Selection.collapsed(
+                  Position(path: [firstContentIndex], offset: 0),
+                );
+
+                // Request focus for the editor
+                editorFocusNode?.requestFocus();
+
+                // Call the original onSubmitted callback
+                onTitleSubmitted?.call(value);
+              },
               cursorColor: theme.primaryText,
               cursorWidth: 2.0,
               cursorRadius: const Radius.circular(1.0),

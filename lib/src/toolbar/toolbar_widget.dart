@@ -369,13 +369,32 @@ class _JournalToolbarState extends State<JournalToolbar> {
           .toList();
     } else if (toolbarState.showTextStyles) {
       Log.info('🔧 Toolbar: Showing text style buttons');
-      return _buttonFactory
-          .getSelectionButtons()
-          .map(_buildToolbarButton)
-          .toList();
+      final buttons = _buttonFactory.getSelectionButtons();
+      return buttons.asMap().entries.map((entry) {
+        final index = entry.key;
+        final button = entry.value;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildToolbarButton(button),
+            if (index < buttons.length - 1) const SizedBox(width: 4.0),
+          ],
+        );
+      }).toList();
     }
     Log.info('🔧 Toolbar: Showing main buttons');
-    return _buttonFactory.getMainButtons().map(_buildToolbarButton).toList();
+    final buttons = _buttonFactory.getMainButtons();
+    return buttons.asMap().entries.map((entry) {
+      final index = entry.key;
+      final button = entry.value;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildToolbarButton(button),
+          if (index < buttons.length - 1) const SizedBox(width: 4.0),
+        ],
+      );
+    }).toList();
   }
 
   Widget _buildToolbarButton(ToolbarButtonConfig config) {
