@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'dart:math';
+import 'package:journal_core/src/toolbar/toolbar_actions.dart';
 
 /// Globally accessible editor state & focus for components that can't access context.
 class EditorGlobals {
@@ -122,42 +124,117 @@ TextSpan defaultTextSpanDecoratorForAttribute(
   final attributes = text.attributes;
   print(
       'TextSpanDecorator: Processing text "${text.text}" with attributes: $attributes');
-  if (attributes == null) {
-    print('TextSpanDecorator: No attributes found, returning before span');
-    return before;
+
+  // Get the current selection
+  final selection = EditorGlobals.editorState?.selection;
+
+  // Create spans for each part
+  final spans = <TextSpan>[];
+
+  // Apply attributes to the text
+  var style = before.style ?? const TextStyle();
+  if (attributes != null) {
+    if (attributes['bold'] == true) {
+      style = style.copyWith(fontWeight: FontWeight.bold);
+    }
+    if (attributes['italic'] == true) {
+      style = style.copyWith(fontStyle: FontStyle.italic);
+    }
+    if (attributes['underline'] == true) {
+      style = style.copyWith(decoration: TextDecoration.underline);
+    }
+    if (attributes['strikethrough'] == true) {
+      style = style.copyWith(decoration: TextDecoration.lineThrough);
+    }
+    if (attributes['color'] != null) {
+      final colorHex = attributes['color'] as String;
+      print('TextSpanDecorator: Found text color: $colorHex');
+      final color = Color(int.parse(colorHex, radix: 16));
+      style = style.copyWith(color: color);
+      print(
+          'TextSpanDecorator: Applied text color: ${color.value.toRadixString(16)}');
+    }
+    if (attributes['backgroundColor'] != null) {
+      final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+      final colorIndex = attributes['backgroundColorIndex'] as int?;
+      if (colorIndex != null && colorIndex >= 0) {
+        // Get the theme-aware color from ToolbarActions
+        final (lightColor, darkColor) = ToolbarActions.bgColorPairs[colorIndex];
+        final color = isDarkMode ? darkColor : lightColor;
+        print('TextSpanDecorator: Found background color index: $colorIndex');
+        style = style.copyWith(backgroundColor: color);
+        print(
+            'TextSpanDecorator: Applied theme-aware background color: ${color.value.toRadixString(16)}');
+      } else {
+        // If no color index is provided, use the theme-aware color for index 0
+        final (lightColor, darkColor) = ToolbarActions.bgColorPairs[0];
+        final color = isDarkMode ? darkColor : lightColor;
+        print(
+            'TextSpanDecorator: No color index found, using default theme color');
+        style = style.copyWith(backgroundColor: color);
+        print(
+            'TextSpanDecorator: Applied theme-aware background color: ${color.value.toRadixString(16)}');
+      }
+    }
   }
 
-  var style = before.style ?? const TextStyle();
-  if (attributes['bold'] == true) {
-    style = style.copyWith(fontWeight: FontWeight.bold);
+  // If there's no selection, just return the styled text
+  if (selection == null) {
+    return TextSpan(text: text.text, style: style);
   }
-  if (attributes['italic'] == true) {
-    style = style.copyWith(fontStyle: FontStyle.italic);
+
+  // Calculate the text boundaries
+  final nodePath = node.path;
+  final nodeOffset = node.delta?.length ?? 0;
+  final selectionStart =
+      selection.start.path == nodePath ? selection.start.offset : 0;
+  final selectionEnd =
+      selection.end.path == nodePath ? selection.end.offset : nodeOffset;
+
+  // If this text is outside the selection range, return it with its style
+  if (index + text.text.length <= selectionStart || index >= selectionEnd) {
+    print('TextSpanDecorator: Text outside selection range, keeping as is');
+    return TextSpan(text: text.text, style: style);
   }
-  if (attributes['underline'] == true) {
-    style = style.copyWith(decoration: TextDecoration.underline);
-  }
-  if (attributes['strikethrough'] == true) {
-    style = style.copyWith(decoration: TextDecoration.lineThrough);
-  }
-  if (attributes['color'] != null) {
-    final colorHex = attributes['color'] as String;
-    print('TextSpanDecorator: Found text color: $colorHex');
-    final color = Color(int.parse(colorHex, radix: 16));
-    style = style.copyWith(color: color);
-    print(
-        'TextSpanDecorator: Applied text color: ${color.value.toRadixString(16)}');
-  }
-  if (attributes['backgroundColor'] != null) {
-    final colorHex = attributes['backgroundColor'] as String;
-    print('TextSpanDecorator: Found background color: $colorHex');
-    final color = Color(int.parse(colorHex, radix: 16));
-    style = style.copyWith(backgroundColor: color);
-    print(
-        'TextSpanDecorator: Applied background color: ${color.value.toRadixString(16)}');
-  }
-  final result = TextSpan(text: text.text, style: style);
+
+  // Calculate the split points relative to this text chunk
+  final start = max(0, selectionStart - index);
+  final end = min(text.text.length, selectionEnd - index);
+
+  // Split the text
+  final beforeText = text.text.substring(0, start);
+  final selectedText = text.text.substring(start, end);
+  final afterText = text.text.substring(end);
+
   print(
-      'TextSpanDecorator: Returning styled span with text "${text.text}" and style: ${style.toString()}');
+      'TextSpanDecorator: Split text into: before="$beforeText", selected="$selectedText", after="$afterText"');
+
+  // Add before text
+  if (beforeText.isNotEmpty) {
+    spans.add(TextSpan(text: beforeText, style: style));
+  }
+
+  // Add selected text
+  if (selectedText.isNotEmpty) {
+    spans.add(TextSpan(text: selectedText, style: style));
+  }
+
+  // Add after text
+  if (afterText.isNotEmpty) {
+    spans.add(TextSpan(text: afterText, style: style));
+  }
+
+  // If we have multiple spans, combine them
+  if (spans.length > 1) {
+    final result = TextSpan(children: spans);
+    print(
+        'TextSpanDecorator: Returning combined span with ${spans.length} children');
+    return result;
+  }
+
+  // If we only have one span, return it directly
+  final result = spans.first;
+  print(
+      'TextSpanDecorator: Returning single span with text "${result.text}" and style: ${result.style?.toString()}');
   return result;
 }

@@ -19,6 +19,12 @@ class JournalExampleApp extends StatelessWidget {
           surface: JournalTheme.light().primaryBackground,
         ),
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.dark(
+          surface: JournalTheme.dark().primaryBackground,
+        ),
+      ),
+      themeMode: ThemeMode.system,
       home: const HomeScreen(),
     );
   }
@@ -68,11 +74,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     return Scaffold(
-      backgroundColor: JournalTheme.light().primaryBackground,
+      backgroundColor: theme.primaryBackground,
       appBar: AppBar(
         title: const Text('Journal Core Example'),
-        backgroundColor: JournalTheme.light().primaryBackground,
+        backgroundColor: theme.primaryBackground,
       ),
       body: SafeArea(
         child: Column(
@@ -150,8 +157,9 @@ class EditorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     return Scaffold(
-      backgroundColor: JournalTheme.light().primaryBackground,
+      backgroundColor: theme.primaryBackground,
       body: EditorWidget(
         journal: journal,
         onSave: (updatedJournal, _) async {

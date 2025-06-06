@@ -10,6 +10,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'dart:math';
 import 'dart:convert';
+import 'package:journal_core/src/theme/journal_theme.dart';
 
 /// Manages toolbar actions for the journal editor, including formatting and insertion.
 /// - Includes debug logs with 🔍 prefix for actions.
@@ -21,6 +22,26 @@ class ToolbarActions {
   final VoidCallback? onDocumentChanged; // Callback for document changes
   final BuildContext context; // For showing dialogs
 
+  // Theme-aware color pairs (light, dark)
+  static const List<(Color, Color)> textColorPairs = [
+    (Color(0xFF000000), Color(0xFFFFFFFF)), // black/white for reset
+    (Color(0xFF3B82F6), Color(0xFF3B82F6)), // blue-500
+    (Color(0xFF22C55E), Color(0xFF22C55E)), // green-500
+    (Color(0xFFF97316), Color(0xFFF97316)), // orange-500
+    (Color(0xFFA855F7), Color(0xFFA855F7)), // purple-500
+    (Color(0xFFD946EF), Color(0xFFD946EF)), // fuchsia-500
+  ];
+
+  // Theme-aware background color pairs (light, dark)
+  static const List<(Color, Color)> bgColorPairs = [
+    (Color(0xFFF5F5F4), Color(0xFF57534E)), // stone-100, stone-600
+    (Color(0xFFDBEAFE), Color(0xFF2563EB)), // blue-100, blue-600
+    (Color(0xFFDCFCE7), Color(0xFF16A34A)), // green-100, green-600
+    (Color(0xFFFFEDD5), Color(0xFFEA580C)), // orange-100, orange-600
+    (Color(0xFFF3E8FF), Color(0xFF9333EA)), // purple-100, purple-600
+    (Color(0xFFFAE8FF), Color(0xFFC026D3)), // fuchsia-100, fuchsia-600
+  ];
+
   ToolbarActions({
     required this.editorState,
     required this.toolbarState,
@@ -28,6 +49,28 @@ class ToolbarActions {
     this.focusNode,
     this.onDocumentChanged,
   });
+
+  /// Get a theme-aware color based on the color index and theme mode
+  static Color getThemeAwareColor(int colorIndex, bool isDarkMode) {
+    // Get the theme colors from JournalTheme
+    final theme = isDarkMode ? JournalTheme.dark() : JournalTheme.light();
+
+    // Define color mappings based on theme colors
+    final colors = [
+      theme.secondaryBackground, // Light/dark background
+      theme.toolbarBackground, // Toolbar background
+      theme.dividerColor, // Divider color
+      theme.metadataText, // Metadata text
+      theme.secondaryText, // Secondary text
+      theme.link, // Link color
+      theme.error, // Error color
+      theme.cursor, // Cursor color
+    ];
+
+    // Ensure the color index is within bounds
+    final index = colorIndex % colors.length;
+    return colors[index];
+  }
 
   String? getPreviousSiblingType(Selection? selection) {
     if (selection == null || selection.start.path.isEmpty) return null;
@@ -387,15 +430,44 @@ class ToolbarActions {
         final opText = op['insert'] as String;
         final opLength = opText.length;
         final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
-        if (currentOffset + opLength > startOffset &&
-            currentOffset < endOffset) {
+
+        // Calculate the overlap with the selection
+        final opStart = currentOffset;
+        final opEnd = currentOffset + opLength;
+        final selectionStart = max(opStart, startOffset);
+        final selectionEnd = min(opEnd, endOffset);
+
+        if (selectionStart < selectionEnd) {
+          // This operation overlaps with the selection
+          if (opStart < selectionStart) {
+            // Add text before selection
+            newDelta.add({
+              'insert': opText.substring(0, selectionStart - opStart),
+              'attributes': Map<String, dynamic>.from(opAttributes),
+            });
+          }
+
+          // Add selected text with toggled style
+          final selectedText = opText.substring(
+            selectionStart - opStart,
+            selectionEnd - opStart,
+          );
           final newAttributes = Map<String, dynamic>.from(opAttributes);
           newAttributes[style] = !(opAttributes[style] ?? false);
           newDelta.add({
-            'insert': opText,
+            'insert': selectedText,
             'attributes': newAttributes,
           });
+
+          if (opEnd > selectionEnd) {
+            // Add text after selection
+            newDelta.add({
+              'insert': opText.substring(selectionEnd - opStart),
+              'attributes': Map<String, dynamic>.from(opAttributes),
+            });
+          }
         } else {
+          // This operation is outside the selection
           newDelta.add(op);
         }
         currentOffset += opLength;
@@ -405,19 +477,11 @@ class ToolbarActions {
     transaction.updateNode(node, {'delta': newDelta});
     editorState.apply(transaction);
 
-    // Restore the selection and focus
+    // Restore selection and focus
     editorState.selection = savedSelection;
     if (hadFocus && focusNode != null) {
       focusNode!.requestFocus();
     }
-
-    // Update toolbar state based on the actual text attributes
-    toolbarState.setTextStyles(
-      bold: isStyleActive('bold'),
-      italic: isStyleActive('italic'),
-      underline: isStyleActive('underline'),
-      strikethrough: isStyleActive('strikethrough'),
-    );
   }
 
   void handleCycleAlignment() {
@@ -1093,92 +1157,63 @@ class ToolbarActions {
       return;
     }
 
-    final transaction = editorState.transaction;
-    final startNode = editorState.getNodeAtPath(selection.start.path);
-    final endNode = editorState.getNodeAtPath(selection.end.path);
-
-    if (startNode == null || endNode == null) {
-      print('ToolbarActions: Could not find nodes at selection paths');
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) {
+      print('ToolbarActions: No node found at path ${selection.start.path}');
       return;
     }
 
-    // If selection is within a single node
-    if (selection.start.path == selection.end.path) {
-      _applyBackgroundColorToNode(startNode, selection.start.offset,
-          selection.end.offset, color, transaction);
-    } else {
-      // Selection spans multiple nodes
-      final startPath = selection.start.path;
-      final endPath = selection.end.path;
-
-      // Get all nodes between start and end
-      var currentNode = startNode;
-      var currentPath = startPath;
-
-      while (currentPath != endPath) {
-        // Apply color to the current node
-        if (currentPath == startPath) {
-          // For the first node, color from selection start to end of node
-          _applyBackgroundColorToNode(currentNode, selection.start.offset,
-              currentNode.delta?.length ?? 0, color, transaction);
-        } else {
-          // For middle nodes, color the entire node
-          _applyBackgroundColorToNode(currentNode, 0,
-              currentNode.delta?.length ?? 0, color, transaction);
-        }
-
-        // Move to next node
-        final nextIndex = currentPath.last + 1;
-        currentPath = [
-          ...currentPath.sublist(0, currentPath.length - 1),
-          nextIndex
-        ];
-        final nextNode = editorState.getNodeAtPath(currentPath);
-        if (nextNode == null) break;
-        currentNode = nextNode;
-      }
-
-      // Apply color to the last node
-      if (currentNode != null) {
-        _applyBackgroundColorToNode(
-            currentNode, 0, selection.end.offset, color, transaction);
-      }
-    }
-
-    editorState.apply(transaction);
-
-    // Update toolbar state
-    toolbarState.isStyleBackgroundColor = color != Colors.transparent;
-  }
-
-  void _applyBackgroundColorToNode(Node node, int startOffset, int endOffset,
-      Color color, Transaction transaction) {
     final attributes = node.attributes;
     final delta = attributes['delta'] as List? ?? [];
-    if (delta.isEmpty) return;
+    if (delta.isEmpty) {
+      print('ToolbarActions: Empty delta found');
+      return;
+    }
 
+    print('ToolbarActions: Current delta: $delta');
+    print(
+        'ToolbarActions: Selection range: ${selection.start.offset} to ${selection.end.offset}');
+
+    final transaction = editorState.transaction;
     final newDelta = <Map<String, dynamic>>[];
     var currentOffset = 0;
+
+    // Find the color index
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    int colorIndex = -1;
+    for (int i = 0; i < bgColorPairs.length; i++) {
+      final (lightColor, darkColor) = bgColorPairs[i];
+      if (color == (isDarkMode ? darkColor : lightColor)) {
+        colorIndex = i;
+        break;
+      }
+    }
 
     for (final op in delta) {
       final opText = op['insert'] as String;
       final opLength = opText.length;
       final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
+      print(
+          'ToolbarActions: Processing text "$opText" at offset $currentOffset with attributes: $opAttributes');
 
-      if (currentOffset + opLength <= startOffset ||
-          currentOffset >= endOffset) {
+      if (currentOffset + opLength <= selection.start.offset ||
+          currentOffset >= selection.end.offset) {
         // Text is outside selection range, keep as is
+        print('ToolbarActions: Text outside selection range, keeping as is');
         newDelta.add(op);
       } else {
         // Text overlaps with selection
         final beforeSelection =
-            opText.substring(0, max(0, startOffset - currentOffset));
+            opText.substring(0, max(0, selection.start.offset - currentOffset));
         final selectedText = opText.substring(
-          max(0, startOffset - currentOffset),
-          min(opLength, endOffset - currentOffset),
+          max(0, selection.start.offset - currentOffset),
+          min(opLength, selection.end.offset - currentOffset),
         );
-        final afterSelection =
-            opText.substring(min(opLength, endOffset - currentOffset));
+        final afterSelection = opText
+            .substring(min(opLength, selection.end.offset - currentOffset));
+
+        print(
+            'ToolbarActions: Splitting text: before="$beforeSelection", selected="$selectedText", after="$afterSelection"');
 
         // Add text before selection
         if (beforeSelection.isNotEmpty) {
@@ -1193,10 +1228,14 @@ class ToolbarActions {
           final newAttributes = Map<String, dynamic>.from(opAttributes);
           if (color == Colors.transparent) {
             newAttributes.remove('backgroundColor');
+            newAttributes.remove('backgroundColorIndex');
           } else {
             newAttributes['backgroundColor'] =
                 color.value.toRadixString(16).padLeft(8, '0');
+            newAttributes['backgroundColorIndex'] = colorIndex;
           }
+          print(
+              'ToolbarActions: Adding selected text with attributes: $newAttributes');
           newDelta.add({
             'insert': selectedText,
             'attributes': newAttributes,
@@ -1214,7 +1253,11 @@ class ToolbarActions {
       currentOffset += opLength;
     }
 
+    print('ToolbarActions: Final new delta: $newDelta');
     transaction.updateNode(node, {'delta': newDelta});
+    editorState.apply(transaction);
+
+    // Update toolbar state
   }
 }
 
@@ -1239,35 +1282,6 @@ class _ColorPickerBottomSheet extends StatefulWidget {
 }
 
 class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
-  static const List<Color> textColors = [
-    Color(0xFF000000), // Default text color (will be overridden by theme)
-    Color(0xFF2196F3), // Blue
-    Color(0xFF4CAF50), // Green
-    Color(0xFFFF9800), // Orange
-    Color(0xFF9C27B0), // Purple
-    Color(0xFFE91E63), // Pink
-  ];
-
-  // Light mode background colors
-  static const List<Color> lightBgColors = [
-    Color(0xFFF5F5F5), // Light Gray
-    Color(0xFFE3F2FD), // Light Blue
-    Color(0xFFE8F5E9), // Light Green
-    Color(0xFFFFF3E0), // Light Orange
-    Color(0xFFF3E5F5), // Light Purple
-    Color(0xFFFCE4EC), // Light Pink
-  ];
-
-  // Dark mode background colors
-  static const List<Color> darkBgColors = [
-    Color(0xFF424242), // Dark Gray
-    Color(0xFF1A237E), // Dark Blue
-    Color(0xFF1B5E20), // Dark Green
-    Color(0xFFE65100), // Dark Orange
-    Color(0xFF4A148C), // Dark Purple
-    Color(0xFF880E4F), // Dark Pink
-  ];
-
   late int selectedTextColor;
   late int selectedBgColor;
   bool _initialized = false;
@@ -1301,7 +1315,6 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
     var currentOffset = 0;
     final cursorOffset = selection.start.offset;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColors = isDarkMode ? darkBgColors : lightBgColors;
 
     // For non-collapsed selection, check all text in the selection
     if (!selection.isCollapsed) {
@@ -1329,9 +1342,13 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
       }
 
       if (foundBgColor && lastBgColor != null) {
-        final index = bgColors.indexOf(lastBgColor);
-        if (index != -1) {
-          setState(() => selectedBgColor = index);
+        // Find the matching color pair
+        for (int i = 0; i < ToolbarActions.bgColorPairs.length; i++) {
+          if (ToolbarActions.bgColorPairs[i].$1 == lastBgColor ||
+              ToolbarActions.bgColorPairs[i].$2 == lastBgColor) {
+            setState(() => selectedBgColor = i);
+            break;
+          }
         }
       } else {
         setState(() => selectedBgColor = -1);
@@ -1351,21 +1368,29 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
         if (opAttributes['color'] != null) {
           final color =
               Color(int.parse(opAttributes['color'] as String, radix: 16));
-          final index = textColors.indexOf(color);
-          if (index != -1) {
-            setState(() => selectedTextColor = index);
+          // Find the matching color pair
+          for (int i = 0; i < ToolbarActions.textColorPairs.length; i++) {
+            if (ToolbarActions.textColorPairs[i].$1 == color ||
+                ToolbarActions.textColorPairs[i].$2 == color) {
+              setState(() => selectedTextColor = i);
+              break;
+            }
           }
         } else {
-          setState(() => selectedTextColor = 0); // Default to black
+          setState(() => selectedTextColor = 0); // Default to black/white
         }
 
         // Update background color
         if (opAttributes['backgroundColor'] != null) {
           final color = Color(
               int.parse(opAttributes['backgroundColor'] as String, radix: 16));
-          final index = bgColors.indexOf(color);
-          if (index != -1) {
-            setState(() => selectedBgColor = index);
+          // Find the matching color pair
+          for (int i = 0; i < ToolbarActions.bgColorPairs.length; i++) {
+            if (ToolbarActions.bgColorPairs[i].$1 == color ||
+                ToolbarActions.bgColorPairs[i].$2 == color) {
+              setState(() => selectedBgColor = i);
+              break;
+            }
           }
         } else {
           setState(() => selectedBgColor = -1); // No background color
@@ -1378,27 +1403,30 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // Create a new list with the first color replaced by the theme's text color
-    final themeAwareTextColors = [
-      Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
-      ...textColors.sublist(1),
-    ];
-
-    // Get the appropriate background colors based on theme
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColors = isDarkMode ? darkBgColors : lightBgColors;
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
+
+    // Get the current theme's colors
+    final currentTextColors = ToolbarActions.textColorPairs
+        .map((pair) => isDarkMode ? pair.$2 : pair.$1)
+        .toList();
+    final currentBgColors = ToolbarActions.bgColorPairs
+        .map((pair) => isDarkMode ? pair.$2 : pair.$1)
+        .toList();
 
     return Material(
-      type: MaterialType.transparency,
+      color: theme.primaryBackground,
+      elevation: 0,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: theme.primaryBackground,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, -1),
+              blurRadius: 10,
+              spreadRadius: 0,
+              offset: const Offset(0, -5),
             ),
           ],
         ),
@@ -1451,8 +1479,13 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                     ),
                     TextButton(
                       onPressed: () {
-                        setState(() => selectedTextColor = -1);
-                        widget.onTextColorChanged(Colors.black);
+                        if (selectedTextColor == 0) {
+                          setState(() => selectedTextColor = 0);
+                          widget.onTextColorChanged(Colors.transparent);
+                        } else {
+                          setState(() => selectedTextColor = 0);
+                          widget.onTextColorChanged(currentTextColors[0]);
+                        }
                       },
                       child: Text(
                         'Reset',
@@ -1466,14 +1499,19 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(textColors.length, (i) {
+                  children: List.generate(currentTextColors.length, (i) {
                     return _ColorOption(
-                      color: themeAwareTextColors[i],
+                      color: currentTextColors[i],
                       label: 'A',
                       selected: selectedTextColor == i,
                       onTap: () {
-                        setState(() => selectedTextColor = i);
-                        widget.onTextColorChanged(themeAwareTextColors[i]);
+                        if (i == 0) {
+                          setState(() => selectedTextColor = 0);
+                          widget.onTextColorChanged(Colors.transparent);
+                        } else {
+                          setState(() => selectedTextColor = i);
+                          widget.onTextColorChanged(currentTextColors[i]);
+                        }
                       },
                     );
                   }),
@@ -1505,15 +1543,15 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(bgColors.length, (i) {
+                  children: List.generate(currentBgColors.length, (i) {
                     return _ColorOption(
-                      color: bgColors[i],
+                      color: currentBgColors[i],
                       label: 'A',
                       selected: selectedBgColor == i,
                       isBackground: true,
                       onTap: () {
                         setState(() => selectedBgColor = i);
-                        widget.onBackgroundColorChanged(bgColors[i]);
+                        widget.onBackgroundColorChanged(currentBgColors[i]);
                       },
                     );
                   }),
