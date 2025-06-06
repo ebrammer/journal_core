@@ -1600,8 +1600,7 @@ class _ColorOption extends StatelessWidget {
             width: selected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
-          color:
-              isBackground ? color : Theme.of(context).scaffoldBackgroundColor,
+          color: isBackground ? color : Colors.transparent,
         ),
         child: isBackground
             ? null
