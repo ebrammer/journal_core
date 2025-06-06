@@ -25,21 +25,24 @@ class ToolbarActions {
   // Theme-aware color pairs (light, dark)
   static const List<(Color, Color)> textColorPairs = [
     (Colors.black, Colors.white), // black/white
-    (Color(0xFF0EA5E9), Color(0xFF0EA5E9)), // blue-500
-    (Color(0xFF84CC16), Color(0xFF84CC16)), // green-500
-    (Color(0xFFF97316), Color(0xFFF97316)), // orange-500
-    (Color(0xFFD946EF), Color(0xFFD946EF)), // fuchsia-500
-    (Color(0xFF78716C), Color(0xFF78716C)), // gray-500
+    (Color(0xFFF5B40B), Color(0xFFF5B40B)), // yellow
+    (Color(0xFF79CE0A), Color(0xFF79CE0A)), // green
+    (Color(0xFF317FFF), Color(0xFF317FFF)), // blue
+    (Color(0xFF9D68FF), Color(0xFF9D68FF)), // purple
+    (Color(0xFFEF4444), Color(0xFFEF4444)), // red
   ];
 
   // Theme-aware background color pairs (light, dark)
   static const List<(Color, Color)> bgColorPairs = [
-    (Color(0xFFE7E5E4), Color(0xFF57534E)), // gray-100/600
-    (Color(0xFF93C5FD), Color(0xFF2563EB)), // blue-300/600
-    (Color(0xFFBEF264), Color(0xFF65A30D)), // green-300/600
-    (Color(0xFFFDBA74), Color(0xFFCA8A04)), // orange-300/500
-    (Color(0xFFF0ABFC), Color(0xFFC026D3)), // fuchsia-300/600
+    (Color(0xFFFBE28F), Color(0xFFF5B40B)), // yellow
+    (Color(0xFFB8EA8C), Color(0xFF79CE0A)), // green
+    (Color(0xFFAED6FF), Color(0xFF317FFF)), // blue
+    (Color(0xFFD9BFFF), Color(0xFF9D68FF)), // purple
+    (Color(0xFFF9A3A3), Color(0xFFEF4444)), // red
   ];
+
+  // Add this as a class field at the top of the ToolbarActions class
+  String? _lastCopiedStyledJson;
 
   ToolbarActions({
     required this.editorState,
@@ -711,6 +714,7 @@ class ToolbarActions {
     final endOffset = selection.end.offset;
     var currentOffset = 0;
     final selectedOps = <Map<String, dynamic>>[];
+    final plainText = StringBuffer();
 
     for (final op in delta) {
       final text = op['insert'] as String;
@@ -722,6 +726,9 @@ class ToolbarActions {
             ? endOffset - currentOffset
             : length;
         final selectedText = text.substring(start, end);
+
+        // Add to plain text buffer
+        plainText.write(selectedText);
 
         // Create a new operation with the selected text and its attributes
         final newOp = {
@@ -735,9 +742,11 @@ class ToolbarActions {
     }
 
     if (selectedOps.isNotEmpty) {
-      // Convert the selected operations to a JSON string
-      final jsonString = jsonEncode(selectedOps);
-      Clipboard.setData(ClipboardData(text: jsonString));
+      // Store the styled version in memory
+      _lastCopiedStyledJson = jsonEncode(selectedOps);
+
+      // Only store plain text in the clipboard
+      Clipboard.setData(ClipboardData(text: plainText.toString()));
       toolbarState.hasClipboardContent = true;
       toolbarState.notifyListeners();
 
@@ -794,66 +803,72 @@ class ToolbarActions {
     final hadFocus = focusNode?.hasFocus ?? false;
 
     try {
-      // Try to parse the clipboard data as JSON (for styled text)
-      final List<dynamic> ops = jsonDecode(data.text!);
-      if (ops is List && ops.isNotEmpty) {
-        final transaction = editorState.transaction;
-        if (selection.isCollapsed) {
-          // Insert each operation with its attributes
-          for (final op in ops) {
-            final text = op['insert'] as String;
-            final attributes = op['attributes'] as Map<String, dynamic>?;
-            transaction.insertText(
+      // Check if we have a styled version in memory
+      if (_lastCopiedStyledJson != null) {
+        final List<dynamic> ops = jsonDecode(_lastCopiedStyledJson!);
+
+        if (ops is List && ops.isNotEmpty) {
+          final transaction = editorState.transaction;
+          if (selection.isCollapsed) {
+            // Insert each operation with its attributes
+            for (final op in ops) {
+              final text = op['insert'] as String;
+              final attributes = op['attributes'] as Map<String, dynamic>?;
+              transaction.insertText(
+                node,
+                selection.start.offset,
+                text,
+                attributes: attributes,
+              );
+            }
+          } else {
+            // Delete selected text first
+            transaction.deleteText(
               node,
               selection.start.offset,
-              text,
-              attributes: attributes,
+              selection.end.offset - selection.start.offset,
             );
+            // Then insert each operation with its attributes
+            for (final op in ops) {
+              final text = op['insert'] as String;
+              final attributes = op['attributes'] as Map<String, dynamic>?;
+              transaction.insertText(
+                node,
+                selection.start.offset,
+                text,
+                attributes: attributes,
+              );
+            }
           }
-        } else {
-          // Delete selected text first
-          transaction.deleteText(
-            node,
-            selection.start.offset,
-            selection.end.offset - selection.start.offset,
-          );
-          // Then insert each operation with its attributes
-          for (final op in ops) {
-            final text = op['insert'] as String;
-            final attributes = op['attributes'] as Map<String, dynamic>?;
-            transaction.insertText(
-              node,
-              selection.start.offset,
-              text,
-              attributes: attributes,
-            );
-          }
+          editorState.apply(transaction);
+          return;
         }
-        editorState.apply(transaction);
       }
     } catch (e) {
-      // If parsing fails, treat as plain text
-      final transaction = editorState.transaction;
-      if (selection.isCollapsed) {
-        transaction.insertText(
-          node,
-          selection.start.offset,
-          data.text!,
-        );
-      } else {
-        transaction.deleteText(
-          node,
-          selection.start.offset,
-          selection.end.offset - selection.start.offset,
-        );
-        transaction.insertText(
-          node,
-          selection.start.offset,
-          data.text!,
-        );
-      }
-      editorState.apply(transaction);
+      // If parsing fails, fall back to plain text
     }
+
+    // Fall back to plain text if styled version is not available
+    final transaction = editorState.transaction;
+    if (selection.isCollapsed) {
+      transaction.insertText(
+        node,
+        selection.start.offset,
+        data.text!,
+      );
+    } else {
+      transaction.deleteText(
+        node,
+        selection.start.offset,
+        selection.end.offset - selection.start.offset,
+      );
+      transaction.insertText(
+        node,
+        selection.start.offset,
+        data.text!,
+      );
+    }
+    editorState.apply(transaction);
 
     // Clear the clipboard and update toolbar state
     await Clipboard.setData(const ClipboardData(text: ''));
@@ -971,11 +986,7 @@ class ToolbarActions {
                   if (hadFocus && focusNode != null) {
                     focusNode!.requestFocus();
                   }
-                  // Close the bottom sheet after color selection
-                  _colorBottomSheetController?.close();
-                  _colorBottomSheetController = null;
-                  editorState.selectionNotifier
-                      .removeListener(selectionListener);
+                  // Keep the bottom sheet open
                 }
               },
               onBackgroundColorChanged: (color) {
@@ -987,11 +998,7 @@ class ToolbarActions {
                   if (hadFocus && focusNode != null) {
                     focusNode!.requestFocus();
                   }
-                  // Close the bottom sheet after color selection
-                  _colorBottomSheetController?.close();
-                  _colorBottomSheetController = null;
-                  editorState.selectionNotifier
-                      .removeListener(selectionListener);
+                  // Keep the bottom sheet open
                 }
               },
               onDone: () {
@@ -1045,35 +1052,9 @@ class ToolbarActions {
     print(
         'ToolbarActions: Selection range: ${selection.start.offset} to ${selection.end.offset}');
 
-    // Log the selected text
-    final startOffset = selection.start.offset;
-    final endOffset = selection.end.offset;
-    var selectedText = '';
-    var currentOffset = 0;
-    for (final op in delta) {
-      final opText = op['insert'] as String;
-      final opLength = opText.length;
-      print(
-          'ToolbarActions: Processing delta operation: text="$opText", length=$opLength, currentOffset=$currentOffset');
-
-      if (currentOffset + opLength > startOffset && currentOffset < endOffset) {
-        final textStart = max(0, startOffset - currentOffset);
-        final textEnd = min(opLength, endOffset - currentOffset);
-        if (textStart < textEnd) {
-          final extractedText = opText.substring(textStart, textEnd);
-          selectedText += extractedText;
-          print(
-              'ToolbarActions: Extracted text from operation: "$extractedText"');
-        }
-      }
-      currentOffset += opLength;
-    }
-    print(
-        'ToolbarActions: Final selected text: "$selectedText" (from $startOffset to $endOffset)');
-
     final transaction = editorState.transaction;
     final newDelta = <Map<String, dynamic>>[];
-    currentOffset = 0;
+    var currentOffset = 0;
 
     for (final op in delta) {
       final opText = op['insert'] as String;
@@ -1082,21 +1063,21 @@ class ToolbarActions {
       print(
           'ToolbarActions: Processing text "$opText" at offset $currentOffset with attributes: $opAttributes');
 
-      if (currentOffset + opLength <= startOffset ||
-          currentOffset >= endOffset) {
+      if (currentOffset + opLength <= selection.start.offset ||
+          currentOffset >= selection.end.offset) {
         // Text is outside selection range, keep as is
         print('ToolbarActions: Text outside selection range, keeping as is');
         newDelta.add(op);
       } else {
         // Text overlaps with selection
         final beforeSelection =
-            opText.substring(0, max(0, startOffset - currentOffset));
+            opText.substring(0, max(0, selection.start.offset - currentOffset));
         final selectedText = opText.substring(
-          max(0, startOffset - currentOffset),
-          min(opLength, endOffset - currentOffset),
+          max(0, selection.start.offset - currentOffset),
+          min(opLength, selection.end.offset - currentOffset),
         );
-        final afterSelection =
-            opText.substring(min(opLength, endOffset - currentOffset));
+        final afterSelection = opText
+            .substring(min(opLength, selection.end.offset - currentOffset));
 
         print(
             'ToolbarActions: Splitting text: before="$beforeSelection", selected="$selectedText", after="$afterSelection"');
@@ -1113,13 +1094,13 @@ class ToolbarActions {
         if (selectedText.isNotEmpty) {
           final newAttributes = Map<String, dynamic>.from(opAttributes);
           if (color == Colors.transparent) {
-            // When resetting, remove all styling attributes
+            // When resetting, only remove text styling attributes
             newAttributes.remove('color');
-            newAttributes.remove('backgroundColor');
             newAttributes.remove('bold');
             newAttributes.remove('italic');
             newAttributes.remove('underline');
             newAttributes.remove('strike');
+            // Preserve background color
           } else {
             newAttributes['color'] =
                 color.value.toRadixString(16).padLeft(8, '0');
@@ -1458,9 +1439,9 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
           children: [
             const SizedBox(height: 24),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   // Black/white reset
                   _ColorOption(
@@ -1472,17 +1453,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                       widget.onTextColorChanged(Colors.transparent);
                     },
                   ),
-                  // Gray text color
-                  _ColorOption(
-                    color: const Color(0xFF6B7280),
-                    label: 'A',
-                    selected: selectedTextColor == 5,
-                    onTap: () {
-                      setState(() => selectedTextColor = 5);
-                      widget.onTextColorChanged(const Color(0xFF6B7280));
-                    },
-                  ),
-                  // Blue
+                  // Yellow
                   _ColorOption(
                     color: currentTextColors[1],
                     label: 'A',
@@ -1502,7 +1473,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                       widget.onTextColorChanged(currentTextColors[2]);
                     },
                   ),
-                  // Orange
+                  // Blue
                   _ColorOption(
                     color: currentTextColors[3],
                     label: 'A',
@@ -1512,7 +1483,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                       widget.onTextColorChanged(currentTextColors[3]);
                     },
                   ),
-                  // Fuchsia
+                  // Purple
                   _ColorOption(
                     color: currentTextColors[4],
                     label: 'A',
@@ -1522,14 +1493,24 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                       widget.onTextColorChanged(currentTextColors[4]);
                     },
                   ),
+                  // Red
+                  _ColorOption(
+                    color: currentTextColors[5],
+                    label: 'A',
+                    selected: selectedTextColor == 5,
+                    onTap: () {
+                      setState(() => selectedTextColor = 5);
+                      widget.onTextColorChanged(currentTextColors[5]);
+                    },
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   // Background reset button
                   GestureDetector(
@@ -1538,9 +1519,9 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                       widget.onBackgroundColorChanged(Colors.transparent);
                     },
                     child: Container(
-                      width: 48,
-                      height: 48,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: 56,
+                      height: 56,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
                         border: Border.all(
                           color: selectedBgColor == -1
@@ -1605,9 +1586,9 @@ class _ColorOption extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 48,
-        height: 48,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        width: 56,
+        height: 56,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
           border: Border.all(
             color: selected
