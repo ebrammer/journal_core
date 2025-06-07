@@ -41,6 +41,15 @@ class ToolbarActions {
     (Color(0xFFF9A3A3), Color(0xFFEF4444)), // red
   ];
 
+  // Theme-aware underline color pairs (light, dark)
+  static const List<(Color, Color)> underlineColorPairs = [
+    (Color(0xFFF5B40B), Color(0xFFF5B40B)), // yellow
+    (Color(0xFF79CE0A), Color(0xFF79CE0A)), // green
+    (Color(0xFF317FFF), Color(0xFF317FFF)), // blue
+    (Color(0xFF9D68FF), Color(0xFF9D68FF)), // purple
+    (Color(0xFFEF4444), Color(0xFFEF4444)), // red
+  ];
+
   // Add this as a class field at the top of the ToolbarActions class
   String? _lastCopiedStyledJson;
 
@@ -1001,6 +1010,18 @@ class ToolbarActions {
                   // Keep the bottom sheet open
                 }
               },
+              onUnderlineColorChanged: (color) {
+                // Use saved selection
+                if (savedSelection != null) {
+                  setUnderlineColor(color);
+                  // Restore selection after color change
+                  editorState.selection = savedSelection;
+                  if (hadFocus && focusNode != null) {
+                    focusNode!.requestFocus();
+                  }
+                  // Keep the bottom sheet open
+                }
+              },
               onDone: () {
                 // Restore selection when closing without color change
                 if (savedSelection != null) {
@@ -1100,6 +1121,7 @@ class ToolbarActions {
             newAttributes.remove('italic');
             newAttributes.remove('underline');
             newAttributes.remove('strike');
+            newAttributes.remove('underlineColor');
             // Preserve background color
           } else {
             newAttributes['color'] =
@@ -1243,18 +1265,101 @@ class ToolbarActions {
 
     // Update toolbar state
   }
+
+  void setUnderlineColor(Color color) {
+    print(
+        'ToolbarActions: Setting underline color to ${color.value.toRadixString(16)}');
+    final selection = editorState.selection;
+    if (selection == null) {
+      print('ToolbarActions: No selection found');
+      return;
+    }
+
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) {
+      print('ToolbarActions: No node found at path ${selection.start.path}');
+      return;
+    }
+
+    final attributes = node.attributes;
+    final delta = attributes['delta'] as List? ?? [];
+    if (delta.isEmpty) {
+      print('ToolbarActions: Empty delta found');
+      return;
+    }
+
+    final transaction = editorState.transaction;
+    final newDelta = <Map<String, dynamic>>[];
+    var currentOffset = 0;
+
+    for (final op in delta) {
+      final opText = op['insert'] as String;
+      final opLength = opText.length;
+      final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
+
+      if (currentOffset + opLength <= selection.start.offset ||
+          currentOffset >= selection.end.offset) {
+        newDelta.add(op);
+      } else {
+        final beforeSelection =
+            opText.substring(0, max(0, selection.start.offset - currentOffset));
+        final selectedText = opText.substring(
+          max(0, selection.start.offset - currentOffset),
+          min(opLength, selection.end.offset - currentOffset),
+        );
+        final afterSelection = opText
+            .substring(min(opLength, selection.end.offset - currentOffset));
+
+        if (beforeSelection.isNotEmpty) {
+          newDelta.add({
+            'insert': beforeSelection,
+            'attributes': Map<String, dynamic>.from(opAttributes),
+          });
+        }
+
+        if (selectedText.isNotEmpty) {
+          final newAttributes = Map<String, dynamic>.from(opAttributes);
+          if (color == Colors.transparent) {
+            newAttributes.remove('underline');
+            newAttributes.remove('underlineColor');
+          } else {
+            newAttributes['underline'] = true;
+            newAttributes['underlineColor'] =
+                color.value.toRadixString(16).padLeft(8, '0');
+          }
+          newDelta.add({
+            'insert': selectedText,
+            'attributes': newAttributes,
+          });
+        }
+
+        if (afterSelection.isNotEmpty) {
+          newDelta.add({
+            'insert': afterSelection,
+            'attributes': Map<String, dynamic>.from(opAttributes),
+          });
+        }
+      }
+      currentOffset += opLength;
+    }
+
+    transaction.updateNode(node, {'delta': newDelta});
+    editorState.apply(transaction);
+  }
 }
 
 // Stub for the custom color picker bottom sheet
 class _ColorPickerBottomSheet extends StatefulWidget {
   final ValueChanged<Color> onTextColorChanged;
   final ValueChanged<Color> onBackgroundColorChanged;
+  final ValueChanged<Color> onUnderlineColorChanged;
   final VoidCallback onDone;
   final EditorState editorState;
 
   const _ColorPickerBottomSheet({
     required this.onTextColorChanged,
     required this.onBackgroundColorChanged,
+    required this.onUnderlineColorChanged,
     required this.onDone,
     required this.editorState,
     Key? key,
@@ -1268,13 +1373,15 @@ class _ColorPickerBottomSheet extends StatefulWidget {
 class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
   late int selectedTextColor;
   late int selectedBgColor;
+  late int selectedUnderlineColor;
   bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
     selectedTextColor = 0;
-    selectedBgColor = -1; // Initialize to -1 to indicate no background color
+    selectedBgColor = -1;
+    selectedUnderlineColor = -1;
   }
 
   @override
@@ -1300,14 +1407,15 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
     final cursorOffset = selection.start.offset;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // For non-collapsed selection, check all text in the selection
     if (!selection.isCollapsed) {
       final startOffset = selection.start.offset;
       final endOffset = selection.end.offset;
       bool foundTextColor = false;
       bool foundBgColor = false;
+      bool foundUnderlineColor = false;
       Color? lastTextColor;
       Color? lastBgColor;
+      Color? lastUnderlineColor;
 
       for (final op in delta) {
         final opText = op['insert'] as String;
@@ -1329,12 +1437,17 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
             lastBgColor = color;
             foundBgColor = true;
           }
+          if (opAttributes['underlineColor'] != null) {
+            final color = Color(
+                int.parse(opAttributes['underlineColor'] as String, radix: 16));
+            lastUnderlineColor = color;
+            foundUnderlineColor = true;
+          }
         }
         currentOffset += opLength;
       }
 
       if (foundTextColor && lastTextColor != null) {
-        // Find the matching color pair
         for (int i = 0; i < ToolbarActions.textColorPairs.length; i++) {
           if (ToolbarActions.textColorPairs[i].$1 == lastTextColor ||
               ToolbarActions.textColorPairs[i].$2 == lastTextColor) {
@@ -1347,7 +1460,6 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
       }
 
       if (foundBgColor && lastBgColor != null) {
-        // Find the matching color pair
         for (int i = 0; i < ToolbarActions.bgColorPairs.length; i++) {
           if (ToolbarActions.bgColorPairs[i].$1 == lastBgColor ||
               ToolbarActions.bgColorPairs[i].$2 == lastBgColor) {
@@ -1358,10 +1470,21 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
       } else {
         setState(() => selectedBgColor = -1);
       }
+
+      if (foundUnderlineColor && lastUnderlineColor != null) {
+        for (int i = 0; i < ToolbarActions.underlineColorPairs.length; i++) {
+          if (ToolbarActions.underlineColorPairs[i].$1 == lastUnderlineColor ||
+              ToolbarActions.underlineColorPairs[i].$2 == lastUnderlineColor) {
+            setState(() => selectedUnderlineColor = i);
+            break;
+          }
+        }
+      } else {
+        setState(() => selectedUnderlineColor = -1);
+      }
       return;
     }
 
-    // For collapsed selection, check only at cursor position
     for (final op in delta) {
       final opText = op['insert'] as String;
       final opLength = opText.length;
@@ -1369,11 +1492,9 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
 
       if (currentOffset <= cursorOffset &&
           cursorOffset <= currentOffset + opLength) {
-        // Update text color
         if (opAttributes['color'] != null) {
           final color =
               Color(int.parse(opAttributes['color'] as String, radix: 16));
-          // Find the matching color pair
           for (int i = 0; i < ToolbarActions.textColorPairs.length; i++) {
             if (ToolbarActions.textColorPairs[i].$1 == color ||
                 ToolbarActions.textColorPairs[i].$2 == color) {
@@ -1385,11 +1506,9 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
           setState(() => selectedTextColor = 0);
         }
 
-        // Update background color
         if (opAttributes['backgroundColor'] != null) {
           final color = Color(
               int.parse(opAttributes['backgroundColor'] as String, radix: 16));
-          // Find the matching color pair
           for (int i = 0; i < ToolbarActions.bgColorPairs.length; i++) {
             if (ToolbarActions.bgColorPairs[i].$1 == color ||
                 ToolbarActions.bgColorPairs[i].$2 == color) {
@@ -1399,6 +1518,20 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
           }
         } else {
           setState(() => selectedBgColor = -1);
+        }
+
+        if (opAttributes['underlineColor'] != null) {
+          final color = Color(
+              int.parse(opAttributes['underlineColor'] as String, radix: 16));
+          for (int i = 0; i < ToolbarActions.underlineColorPairs.length; i++) {
+            if (ToolbarActions.underlineColorPairs[i].$1 == color ||
+                ToolbarActions.underlineColorPairs[i].$2 == color) {
+              setState(() => selectedUnderlineColor = i);
+              break;
+            }
+          }
+        } else {
+          setState(() => selectedUnderlineColor = -1);
         }
         break;
       }
@@ -1415,12 +1548,28 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
     final currentBgColors = ToolbarActions.bgColorPairs
         .map((pair) => isDarkMode ? pair.$2 : pair.$1)
         .toList();
+    final currentUnderlineColors = ToolbarActions.underlineColorPairs
+        .map((pair) => isDarkMode ? pair.$2 : pair.$1)
+        .toList();
+
+    // Calculate button size based on screen width
+    final screenWidth = MediaQuery.of(context).size.width;
+    final availableWidth = screenWidth - 32; // Account for horizontal padding
+    final buttonSize =
+        (availableWidth - 12) / 7; // 12 is total margin space (6 gaps * 2px)
+    final finalSize = buttonSize.clamp(40.0, 54.0);
 
     final backgroundColor = isDarkMode
         ? const Color(0xFF3D3D3D)
         : const Color.fromARGB(255, 255, 255, 255);
 
+    // Calculate max height as 50% of screen height
+    final maxHeight = MediaQuery.of(context).size.height * 0.5;
+
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: maxHeight,
+      ),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -1440,131 +1589,297 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
         ),
         child: SafeArea(
           bottom: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Black/white reset
-                    _ColorOption(
-                      color: currentTextColors[0],
-                      label: 'A',
-                      selected: selectedTextColor == 0,
-                      onTap: () {
-                        setState(() => selectedTextColor = 0);
-                        widget.onTextColorChanged(Colors.transparent);
-                      },
-                    ),
-                    // Yellow
-                    _ColorOption(
-                      color: currentTextColors[1],
-                      label: 'A',
-                      selected: selectedTextColor == 1,
-                      onTap: () {
-                        setState(() => selectedTextColor = 1);
-                        widget.onTextColorChanged(currentTextColors[1]);
-                      },
-                    ),
-                    // Green
-                    _ColorOption(
-                      color: currentTextColors[2],
-                      label: 'A',
-                      selected: selectedTextColor == 2,
-                      onTap: () {
-                        setState(() => selectedTextColor = 2);
-                        widget.onTextColorChanged(currentTextColors[2]);
-                      },
-                    ),
-                    // Blue
-                    _ColorOption(
-                      color: currentTextColors[3],
-                      label: 'A',
-                      selected: selectedTextColor == 3,
-                      onTap: () {
-                        setState(() => selectedTextColor = 3);
-                        widget.onTextColorChanged(currentTextColors[3]);
-                      },
-                    ),
-                    // Purple
-                    _ColorOption(
-                      color: currentTextColors[4],
-                      label: 'A',
-                      selected: selectedTextColor == 4,
-                      onTap: () {
-                        setState(() => selectedTextColor = 4);
-                        widget.onTextColorChanged(currentTextColors[4]);
-                      },
-                    ),
-                    // Red
-                    _ColorOption(
-                      color: currentTextColors[5],
-                      label: 'A',
-                      selected: selectedTextColor == 5,
-                      onTap: () {
-                        setState(() => selectedTextColor = 5);
-                        widget.onTextColorChanged(currentTextColors[5]);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Background reset button
-                    GestureDetector(
-                      onTap: () {
-                        setState(() => selectedBgColor = -1);
-                        widget.onBackgroundColorChanged(Colors.transparent);
-                      },
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: selectedBgColor == -1
-                                ? (isDarkMode ? Colors.white : Colors.black)
-                                : Theme.of(context).dividerColor.withAlpha(26),
-                            width: selectedBgColor == -1 ? 2 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title row with done button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Color Options',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
                         ),
-                        child: Center(
-                          child: Icon(
-                            Icons.format_color_reset,
-                            color: selectedBgColor == -1
-                                ? (isDarkMode ? Colors.white : Colors.black)
-                                : Theme.of(context).dividerColor.withAlpha(128),
+                      ),
+                      TextButton(
+                        onPressed: widget.onDone,
+                        child: Text(
+                          'Done',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                            fontSize: 16,
                           ),
                         ),
                       ),
-                    ),
-                    ...List.generate(currentBgColors.length, (i) {
-                      return _ColorOption(
-                        color: currentBgColors[i],
-                        label: 'A',
-                        selected: selectedBgColor == i,
-                        isBackground: true,
-                        onTap: () {
-                          setState(() => selectedBgColor = i);
-                          widget.onBackgroundColorChanged(currentBgColors[i]);
-                        },
-                      );
-                    }),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 16),
+                // Underline section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Underline',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Colors.black87,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Underline reset button
+                            GestureDetector(
+                              onTap: () {
+                                setState(() => selectedUnderlineColor = -1);
+                                widget.onUnderlineColorChanged(
+                                    Colors.transparent);
+                              },
+                              child: Container(
+                                width: finalSize,
+                                height: finalSize,
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 1),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: selectedUnderlineColor == -1
+                                        ? isDarkMode
+                                            ? Colors.white
+                                            : Colors.black
+                                        : Theme.of(context)
+                                            .dividerColor
+                                            .withAlpha(26),
+                                    width: selectedUnderlineColor == -1 ? 2 : 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: selectedUnderlineColor == -1
+                                      ? Icon(
+                                          Icons.check,
+                                          color: isDarkMode
+                                              ? Colors.white
+                                              : Colors.black,
+                                          size: finalSize * 0.5,
+                                        )
+                                      : Icon(
+                                          Icons.format_color_reset,
+                                          color: Theme.of(context)
+                                              .dividerColor
+                                              .withAlpha(128),
+                                          size: finalSize * 0.5,
+                                        ),
+                                ),
+                              ),
+                            ),
+                            ...List.generate(currentUnderlineColors.length,
+                                (i) {
+                              return _ColorOption(
+                                color: currentUnderlineColors[i],
+                                label: 'U',
+                                selected: selectedUnderlineColor == i,
+                                isUnderline: true,
+                                onTap: () {
+                                  setState(() => selectedUnderlineColor = i);
+                                  widget.onUnderlineColorChanged(
+                                      currentUnderlineColors[i]);
+                                },
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Text color section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Text',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Colors.black87,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Black/white reset
+                            _ColorOption(
+                              color: currentTextColors[0],
+                              label: 'A',
+                              selected: selectedTextColor == 0,
+                              onTap: () {
+                                setState(() => selectedTextColor = 0);
+                                widget.onTextColorChanged(Colors.transparent);
+                              },
+                            ),
+                            // Yellow
+                            _ColorOption(
+                              color: currentTextColors[1],
+                              label: 'A',
+                              selected: selectedTextColor == 1,
+                              onTap: () {
+                                setState(() => selectedTextColor = 1);
+                                widget.onTextColorChanged(currentTextColors[1]);
+                              },
+                            ),
+                            // Green
+                            _ColorOption(
+                              color: currentTextColors[2],
+                              label: 'A',
+                              selected: selectedTextColor == 2,
+                              onTap: () {
+                                setState(() => selectedTextColor = 2);
+                                widget.onTextColorChanged(currentTextColors[2]);
+                              },
+                            ),
+                            // Blue
+                            _ColorOption(
+                              color: currentTextColors[3],
+                              label: 'A',
+                              selected: selectedTextColor == 3,
+                              onTap: () {
+                                setState(() => selectedTextColor = 3);
+                                widget.onTextColorChanged(currentTextColors[3]);
+                              },
+                            ),
+                            // Purple
+                            _ColorOption(
+                              color: currentTextColors[4],
+                              label: 'A',
+                              selected: selectedTextColor == 4,
+                              onTap: () {
+                                setState(() => selectedTextColor = 4);
+                                widget.onTextColorChanged(currentTextColors[4]);
+                              },
+                            ),
+                            // Red
+                            _ColorOption(
+                              color: currentTextColors[5],
+                              label: 'A',
+                              selected: selectedTextColor == 5,
+                              onTap: () {
+                                setState(() => selectedTextColor = 5);
+                                widget.onTextColorChanged(currentTextColors[5]);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Background color section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Background',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Colors.black87,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Background reset button
+                            GestureDetector(
+                              onTap: () {
+                                setState(() => selectedBgColor = -1);
+                                widget.onBackgroundColorChanged(
+                                    Colors.transparent);
+                              },
+                              child: Container(
+                                width: finalSize,
+                                height: finalSize,
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 1),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: selectedBgColor == -1
+                                        ? isDarkMode
+                                            ? Colors.white
+                                            : Colors.black
+                                        : Theme.of(context)
+                                            .dividerColor
+                                            .withAlpha(26),
+                                    width: selectedBgColor == -1 ? 2 : 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: selectedBgColor == -1
+                                      ? Icon(
+                                          Icons.check,
+                                          color: isDarkMode
+                                              ? Colors.white
+                                              : Colors.black,
+                                          size: finalSize * 0.5,
+                                        )
+                                      : Icon(
+                                          Icons.format_color_reset,
+                                          color: Theme.of(context)
+                                              .dividerColor
+                                              .withAlpha(128),
+                                          size: finalSize * 0.5,
+                                        ),
+                                ),
+                              ),
+                            ),
+                            ...List.generate(currentBgColors.length, (i) {
+                              return _ColorOption(
+                                color: currentBgColors[i],
+                                label: 'A',
+                                selected: selectedBgColor == i,
+                                isBackground: true,
+                                onTap: () {
+                                  setState(() => selectedBgColor = i);
+                                  widget.onBackgroundColorChanged(
+                                      currentBgColors[i]);
+                                },
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -1578,6 +1893,7 @@ class _ColorOption extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final bool isBackground;
+  final bool isUnderline;
 
   const _ColorOption({
     required this.color,
@@ -1585,44 +1901,85 @@ class _ColorOption extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.isBackground = false,
+    this.isUnderline = false,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Calculate button size based on screen width
+    final screenWidth = MediaQuery.of(context).size.width;
+    final availableWidth = screenWidth - 32; // Account for horizontal padding
+    final buttonSize =
+        (availableWidth - 12) / 7; // 12 is total margin space (6 gaps * 2px)
+    final finalSize = buttonSize.clamp(40.0, 54.0);
+
+    // For background colors, use the corresponding text color for outline and checkmark
+    Color outlineColor;
+    if (isBackground && selected) {
+      // Map background colors to their corresponding text colors
+      // Yellow background -> Yellow text
+      // Green background -> Green text
+      // Blue background -> Blue text
+      // Purple background -> Purple text
+      // Red background -> Red text
+      if (color == ToolbarActions.bgColorPairs[0].$1) {
+        outlineColor = ToolbarActions.textColorPairs[1].$1; // Yellow
+      } else if (color == ToolbarActions.bgColorPairs[1].$1) {
+        outlineColor = ToolbarActions.textColorPairs[2].$1; // Green
+      } else if (color == ToolbarActions.bgColorPairs[2].$1) {
+        outlineColor = ToolbarActions.textColorPairs[3].$1; // Blue
+      } else if (color == ToolbarActions.bgColorPairs[3].$1) {
+        outlineColor = ToolbarActions.textColorPairs[4].$1; // Purple
+      } else if (color == ToolbarActions.bgColorPairs[4].$1) {
+        outlineColor = ToolbarActions.textColorPairs[5].$1; // Red
+      } else {
+        outlineColor = color; // Fallback
+      }
+    } else {
+      outlineColor =
+          selected ? color : Theme.of(context).dividerColor.withAlpha(26);
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 56,
-        height: 56,
-        margin: const EdgeInsets.symmetric(horizontal: 2),
+        width: finalSize,
+        height: finalSize,
+        margin: const EdgeInsets.symmetric(horizontal: 1),
         decoration: BoxDecoration(
           border: Border.all(
-            color: selected
-                ? (isDarkMode ? Colors.white : Colors.black)
-                : (isBackground
-                    ? color
-                    : Theme.of(context).dividerColor.withAlpha(26)),
+            color: outlineColor,
             width: selected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
-          color: isBackground ? color : Colors.transparent,
+          color: isBackground && (!selected || !isDarkMode)
+              ? color
+              : Colors.transparent,
         ),
         child: Center(
           child: selected
-              ? Icon(Icons.check,
-                  color: isBackground
-                      ? (isDarkMode ? Colors.white : Colors.black)
-                      : color)
-              : Text(
-                  label,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+              ? Icon(Icons.check, color: outlineColor)
+              : isUnderline
+                  ? Icon(
+                      Icons.text_format,
+                      color: color,
+                      size: finalSize * 0.6,
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: finalSize * 0.4,
+                        fontWeight: FontWeight.bold,
+                        decoration:
+                            isUnderline ? TextDecoration.underline : null,
+                        decorationColor: color,
+                        decorationThickness: 1,
+                      ),
+                    ),
         ),
       ),
     );

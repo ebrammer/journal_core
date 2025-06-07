@@ -141,7 +141,18 @@ TextSpan defaultTextSpanDecoratorForAttribute(
       style = style.copyWith(fontStyle: FontStyle.italic);
     }
     if (attributes['underline'] == true) {
-      style = style.copyWith(decoration: TextDecoration.underline);
+      if (attributes['underlineColor'] != null) {
+        final colorHex = attributes['underlineColor'] as String;
+        final color = Color(int.parse(colorHex, radix: 16));
+        style = style.copyWith(
+          decoration: TextDecoration.underline,
+          decorationColor: color,
+          decorationThickness: 1,
+          decorationStyle: TextDecorationStyle.solid,
+        );
+      } else {
+        style = style.copyWith(decoration: TextDecoration.underline);
+      }
     }
     if (attributes['strikethrough'] == true) {
       style = style.copyWith(decoration: TextDecoration.lineThrough);
@@ -154,27 +165,18 @@ TextSpan defaultTextSpanDecoratorForAttribute(
       print(
           'TextSpanDecorator: Applied text color: ${color.value.toRadixString(16)}');
     }
-    if (attributes['backgroundColor'] != null) {
-      final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-      final colorIndex = attributes['backgroundColorIndex'] as int?;
-      if (colorIndex != null && colorIndex >= 0) {
-        // Get the theme-aware color from ToolbarActions
-        final (lightColor, darkColor) = ToolbarActions.bgColorPairs[colorIndex];
-        final color = isDarkMode ? darkColor : lightColor;
-        print('TextSpanDecorator: Found background color index: $colorIndex');
-        style = style.copyWith(backgroundColor: color);
-        print(
-            'TextSpanDecorator: Applied theme-aware background color: ${color.value.toRadixString(16)}');
-      } else {
-        // If no color index is provided, use the theme-aware color for index 0
-        final (lightColor, darkColor) = ToolbarActions.bgColorPairs[0];
-        final color = isDarkMode ? darkColor : lightColor;
-        print(
-            'TextSpanDecorator: No color index found, using default theme color');
-        style = style.copyWith(backgroundColor: color);
-        print(
-            'TextSpanDecorator: Applied theme-aware background color: ${color.value.toRadixString(16)}');
-      }
+
+    // Handle background color
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final colorIndex = attributes['backgroundColorIndex'] as int?;
+    if (colorIndex != null && colorIndex >= 0) {
+      // Get the theme-aware color from ToolbarActions
+      final (lightColor, darkColor) = ToolbarActions.bgColorPairs[colorIndex];
+      final color = isDarkMode ? darkColor : lightColor;
+      print('TextSpanDecorator: Found background color index: $colorIndex');
+      style = style.copyWith(backgroundColor: color);
+      print(
+          'TextSpanDecorator: Applied theme-aware background color: ${color.value.toRadixString(16)}');
     }
   }
 
