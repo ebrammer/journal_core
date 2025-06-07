@@ -22,6 +22,9 @@ class ToolbarActions {
   final VoidCallback? onDocumentChanged; // Callback for document changes
   final BuildContext context; // For showing dialogs
 
+  // Add new field to track visual selection state
+  Selection? _visualSelection;
+
   // Theme-aware color pairs (light, dark)
   static const List<(Color, Color)> textColorPairs = [
     (Colors.black, Colors.white), // black/white
@@ -953,9 +956,9 @@ class ToolbarActions {
   void showColorBottomSheet() {
     print('ToolbarActions: Opening persistent color bottom sheet');
     final scaffold = Scaffold.of(context);
-    // Save selection and focus
-    final hadFocus = focusNode?.hasFocus ?? false;
-    final savedSelection = editorState.selection;
+
+    // Save the current selection as visual selection
+    _visualSelection = editorState.selection;
 
     // Hide keyboard using SystemChannels
     SystemChannels.textInput.invokeMethod('TextInput.hide');
@@ -968,12 +971,14 @@ class ToolbarActions {
     void selectionListener() {
       final currentSelection = editorState.selection;
       if (currentSelection != null &&
-          (savedSelection == null ||
-              currentSelection.start.path != savedSelection.start.path ||
-              currentSelection.start.offset != savedSelection.start.offset)) {
+          (_visualSelection == null ||
+              currentSelection.start.path != _visualSelection!.start.path ||
+              currentSelection.start.offset !=
+                  _visualSelection!.start.offset)) {
         _colorBottomSheetController?.close();
         _colorBottomSheetController = null;
         editorState.selectionNotifier.removeListener(selectionListener);
+        _visualSelection = null;
       }
     }
 
@@ -987,49 +992,29 @@ class ToolbarActions {
           builder: (context, snapshot) {
             return _ColorPickerBottomSheet(
               onTextColorChanged: (color) {
-                // Use saved selection
-                if (savedSelection != null) {
+                if (_visualSelection != null) {
                   setTextColor(color);
-                  // Restore selection after color change
-                  editorState.selection = savedSelection;
-                  if (hadFocus && focusNode != null) {
-                    focusNode!.requestFocus();
-                  }
-                  // Keep the bottom sheet open
+                  // Don't restore focus or selection
                 }
               },
               onBackgroundColorChanged: (color) {
-                // Use saved selection
-                if (savedSelection != null) {
+                if (_visualSelection != null) {
                   setBackgroundColor(color);
-                  // Restore selection after color change
-                  editorState.selection = savedSelection;
-                  if (hadFocus && focusNode != null) {
-                    focusNode!.requestFocus();
-                  }
-                  // Keep the bottom sheet open
+                  // Don't restore focus or selection
                 }
               },
               onUnderlineColorChanged: (color) {
-                // Use saved selection
-                if (savedSelection != null) {
+                if (_visualSelection != null) {
                   setUnderlineColor(color);
-                  // Restore selection after color change
-                  editorState.selection = savedSelection;
-                  if (hadFocus && focusNode != null) {
-                    focusNode!.requestFocus();
-                  }
-                  // Keep the bottom sheet open
+                  // Don't restore focus or selection
                 }
               },
               onDone: () {
-                // Restore selection when closing without color change
-                if (savedSelection != null) {
-                  editorState.selection = savedSelection;
-                  if (hadFocus && focusNode != null) {
-                    focusNode!.requestFocus();
-                  }
+                // Restore the selection when closing
+                if (_visualSelection != null) {
+                  editorState.selection = _visualSelection;
                 }
+                _visualSelection = null;
                 _colorBottomSheetController?.close();
                 _colorBottomSheetController = null;
                 editorState.selectionNotifier.removeListener(selectionListener);
@@ -1050,7 +1035,8 @@ class ToolbarActions {
   void setTextColor(Color color) {
     print(
         'ToolbarActions: Setting text color to ${color.value.toRadixString(16)}');
-    final selection = editorState.selection;
+    // Use visual selection instead of current selection
+    final selection = _visualSelection ?? editorState.selection;
     if (selection == null) {
       print('ToolbarActions: No selection found');
       return;
@@ -1157,7 +1143,8 @@ class ToolbarActions {
   void setBackgroundColor(Color color) {
     print(
         'ToolbarActions: Setting background color to ${color.value.toRadixString(16)}');
-    final selection = editorState.selection;
+    // Use visual selection instead of current selection
+    final selection = _visualSelection ?? editorState.selection;
     if (selection == null) {
       print('ToolbarActions: No selection found');
       return;
@@ -1269,7 +1256,8 @@ class ToolbarActions {
   void setUnderlineColor(Color color) {
     print(
         'ToolbarActions: Setting underline color to ${color.value.toRadixString(16)}');
-    final selection = editorState.selection;
+    // Use visual selection instead of current selection
+    final selection = _visualSelection ?? editorState.selection;
     if (selection == null) {
       print('ToolbarActions: No selection found');
       return;
