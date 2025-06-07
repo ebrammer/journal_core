@@ -1009,6 +1009,12 @@ class ToolbarActions {
                   // Don't restore focus or selection
                 }
               },
+              onUnderlineStyleChanged: (style) {
+                if (_visualSelection != null) {
+                  setUnderlineStyle(style);
+                  // Don't restore focus or selection
+                }
+              },
               onDone: () {
                 // Restore the selection when closing
                 if (_visualSelection != null) {
@@ -1254,27 +1260,28 @@ class ToolbarActions {
   }
 
   void setUnderlineColor(Color color) {
-    print(
-        'ToolbarActions: Setting underline color to ${color.value.toRadixString(16)}');
+    print('Setting underline color to: ${color.value.toRadixString(16)}');
     // Use visual selection instead of current selection
     final selection = _visualSelection ?? editorState.selection;
     if (selection == null) {
-      print('ToolbarActions: No selection found');
+      print('No selection found');
       return;
     }
 
     final node = editorState.getNodeAtPath(selection.start.path);
     if (node == null) {
-      print('ToolbarActions: No node found at path ${selection.start.path}');
+      print('No node found at path');
       return;
     }
 
     final attributes = node.attributes;
     final delta = attributes['delta'] as List? ?? [];
     if (delta.isEmpty) {
-      print('ToolbarActions: Empty delta found');
+      print('Empty delta found');
       return;
     }
+
+    print('Current delta: $delta');
 
     final transaction = editorState.transaction;
     final newDelta = <Map<String, dynamic>>[];
@@ -1284,6 +1291,7 @@ class ToolbarActions {
       final opText = op['insert'] as String;
       final opLength = opText.length;
       final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
+      print('Processing text: "$opText" with attributes: $opAttributes');
 
       if (currentOffset + opLength <= selection.start.offset ||
           currentOffset >= selection.end.offset) {
@@ -1298,6 +1306,9 @@ class ToolbarActions {
         final afterSelection = opText
             .substring(min(opLength, selection.end.offset - currentOffset));
 
+        print(
+            'Split text: before="$beforeSelection", selected="$selectedText", after="$afterSelection"');
+
         if (beforeSelection.isNotEmpty) {
           newDelta.add({
             'insert': beforeSelection,
@@ -1307,14 +1318,18 @@ class ToolbarActions {
 
         if (selectedText.isNotEmpty) {
           final newAttributes = Map<String, dynamic>.from(opAttributes);
-          if (color == Colors.transparent) {
-            newAttributes.remove('underline');
-            newAttributes.remove('underlineColor');
-          } else {
-            newAttributes['underline'] = true;
-            newAttributes['underlineColor'] =
-                color.value.toRadixString(16).padLeft(8, '0');
+
+          // Always set underline and color
+          newAttributes['underline'] = true;
+          newAttributes['underlineColor'] =
+              'FF${color.value.toRadixString(16).substring(2)}';
+
+          // Keep existing style or use default
+          if (opAttributes['underlineStyle'] == null) {
+            newAttributes['underlineStyle'] = 'solid';
           }
+
+          print('New attributes for selected text: $newAttributes');
           newDelta.add({
             'insert': selectedText,
             'attributes': newAttributes,
@@ -1331,6 +1346,100 @@ class ToolbarActions {
       currentOffset += opLength;
     }
 
+    print('Final new delta: $newDelta');
+    transaction.updateNode(node, {'delta': newDelta});
+    editorState.apply(transaction);
+  }
+
+  void setUnderlineStyle(String style) {
+    print('Setting underline style to: $style');
+    // Use visual selection instead of current selection
+    final selection = _visualSelection ?? editorState.selection;
+    if (selection == null) {
+      print('No selection found');
+      return;
+    }
+
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) {
+      print('No node found at path');
+      return;
+    }
+
+    final attributes = node.attributes;
+    final delta = attributes['delta'] as List? ?? [];
+    if (delta.isEmpty) {
+      print('Empty delta found');
+      return;
+    }
+
+    print('Current delta: $delta');
+
+    final transaction = editorState.transaction;
+    final newDelta = <Map<String, dynamic>>[];
+    var currentOffset = 0;
+
+    for (final op in delta) {
+      final opText = op['insert'] as String;
+      final opLength = opText.length;
+      final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
+      print('Processing text: "$opText" with attributes: $opAttributes');
+
+      if (currentOffset + opLength <= selection.start.offset ||
+          currentOffset >= selection.end.offset) {
+        newDelta.add(op);
+      } else {
+        final beforeSelection =
+            opText.substring(0, max(0, selection.start.offset - currentOffset));
+        final selectedText = opText.substring(
+          max(0, selection.start.offset - currentOffset),
+          min(opLength, selection.end.offset - currentOffset),
+        );
+        final afterSelection = opText
+            .substring(min(opLength, selection.end.offset - currentOffset));
+
+        print(
+            'Split text: before="$beforeSelection", selected="$selectedText", after="$afterSelection"');
+
+        if (beforeSelection.isNotEmpty) {
+          newDelta.add({
+            'insert': beforeSelection,
+            'attributes': Map<String, dynamic>.from(opAttributes),
+          });
+        }
+
+        if (selectedText.isNotEmpty) {
+          final newAttributes = Map<String, dynamic>.from(opAttributes);
+
+          // Always set underline and style
+          newAttributes['underline'] = true;
+          newAttributes['underlineStyle'] = style;
+
+          // Keep existing color or use default
+          if (opAttributes['underlineColor'] == null) {
+            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+            newAttributes['underlineColor'] =
+                isDarkMode ? 'FFFFFFFF' : 'FF000000';
+          }
+
+          print('New attributes for selected text: $newAttributes');
+          newDelta.add({
+            'insert': selectedText,
+            'attributes': newAttributes,
+          });
+        }
+
+        if (afterSelection.isNotEmpty) {
+          newDelta.add({
+            'insert': afterSelection,
+            'attributes': Map<String, dynamic>.from(opAttributes),
+          });
+        }
+      }
+      currentOffset += opLength;
+    }
+
+    print('Final new delta: $newDelta');
     transaction.updateNode(node, {'delta': newDelta});
     editorState.apply(transaction);
   }
@@ -1341,6 +1450,7 @@ class _ColorPickerBottomSheet extends StatefulWidget {
   final ValueChanged<Color> onTextColorChanged;
   final ValueChanged<Color> onBackgroundColorChanged;
   final ValueChanged<Color> onUnderlineColorChanged;
+  final ValueChanged<String> onUnderlineStyleChanged;
   final VoidCallback onDone;
   final EditorState editorState;
 
@@ -1348,6 +1458,7 @@ class _ColorPickerBottomSheet extends StatefulWidget {
     required this.onTextColorChanged,
     required this.onBackgroundColorChanged,
     required this.onUnderlineColorChanged,
+    required this.onUnderlineStyleChanged,
     required this.onDone,
     required this.editorState,
     Key? key,
@@ -1362,6 +1473,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
   late int selectedTextColor;
   late int selectedBgColor;
   late int selectedUnderlineColor;
+  String selectedUnderlineStyle = 'solid';
   bool _initialized = false;
 
   @override
@@ -1370,6 +1482,11 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
     selectedTextColor = 0;
     selectedBgColor = -1;
     selectedUnderlineColor = -1;
+  }
+
+  void setUnderlineStyle(String style) {
+    setState(() => selectedUnderlineStyle = style);
+    widget.onUnderlineStyleChanged(style);
   }
 
   @override
@@ -1404,6 +1521,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
       Color? lastTextColor;
       Color? lastBgColor;
       Color? lastUnderlineColor;
+      String? lastUnderlineStyle;
 
       for (final op in delta) {
         final opText = op['insert'] as String;
@@ -1430,6 +1548,8 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                 int.parse(opAttributes['underlineColor'] as String, radix: 16));
             lastUnderlineColor = color;
             foundUnderlineColor = true;
+            lastUnderlineStyle =
+                opAttributes['underlineStyle'] as String? ?? 'solid';
           }
         }
         currentOffset += opLength;
@@ -1463,12 +1583,18 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
         for (int i = 0; i < ToolbarActions.underlineColorPairs.length; i++) {
           if (ToolbarActions.underlineColorPairs[i].$1 == lastUnderlineColor ||
               ToolbarActions.underlineColorPairs[i].$2 == lastUnderlineColor) {
-            setState(() => selectedUnderlineColor = i);
+            setState(() {
+              selectedUnderlineColor = i;
+              selectedUnderlineStyle = lastUnderlineStyle ?? 'solid';
+            });
             break;
           }
         }
       } else {
-        setState(() => selectedUnderlineColor = -1);
+        setState(() {
+          selectedUnderlineColor = -1;
+          selectedUnderlineStyle = 'solid';
+        });
       }
       return;
     }
@@ -1616,13 +1742,43 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Underline',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white70 : Colors.black87,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Underline',
+                            style: TextStyle(
+                              color:
+                                  isDarkMode ? Colors.white70 : Colors.black87,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          // Style buttons
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _UnderlineStyleButton(
+                                label: 'Solid',
+                                isSelected: selectedUnderlineStyle == 'solid',
+                                onTap: () => setUnderlineStyle('solid'),
+                              ),
+                              Text(
+                                ' | ',
+                                style: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.white70
+                                      : Colors.black87,
+                                ),
+                              ),
+                              _UnderlineStyleButton(
+                                label: 'Dashed',
+                                isSelected: selectedUnderlineStyle == 'dashed',
+                                onTap: () => setUnderlineStyle('dashed'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       SizedBox(
@@ -2002,6 +2158,34 @@ class _BgColorOption extends StatelessWidget {
           ),
         ),
         child: selected ? const Icon(Icons.check, color: Colors.blue) : null,
+      ),
+    );
+  }
+}
+
+class _UnderlineStyleButton extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _UnderlineStyleButton({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }

@@ -141,17 +141,30 @@ TextSpan defaultTextSpanDecoratorForAttribute(
       style = style.copyWith(fontStyle: FontStyle.italic);
     }
     if (attributes['underline'] == true) {
-      if (attributes['underlineColor'] != null) {
-        final colorHex = attributes['underlineColor'] as String;
-        final color = Color(int.parse(colorHex, radix: 16));
+      final underlineColor = attributes['underlineColor'] as String?;
+      if (underlineColor != null) {
+        final color = Color(int.parse(underlineColor, radix: 16));
+        final underlineStyle =
+            attributes['underlineStyle'] as String? ?? 'solid';
+        print('TextSpanDecorator: Found underline style: $underlineStyle');
+        var decorationStyle = TextDecorationStyle.solid;
+        switch (underlineStyle) {
+          case 'dashed':
+            decorationStyle = TextDecorationStyle.dashed;
+            break;
+          default:
+            decorationStyle = TextDecorationStyle.solid;
+        }
+        print(
+            'TextSpanDecorator: Setting decoration style to: $decorationStyle');
+
+        // Apply the style
         style = style.copyWith(
           decoration: TextDecoration.underline,
           decorationColor: color,
-          decorationThickness: 1,
-          decorationStyle: TextDecorationStyle.solid,
+          decorationStyle: decorationStyle,
+          decorationThickness: 1.0,
         );
-      } else {
-        style = style.copyWith(decoration: TextDecoration.underline);
       }
     }
     if (attributes['strikethrough'] == true) {
@@ -239,4 +252,42 @@ TextSpan defaultTextSpanDecoratorForAttribute(
   print(
       'TextSpanDecorator: Returning single span with text "${result.text}" and style: ${result.style?.toString()}');
   return result;
+}
+
+// Add this class at the end of the file
+class DottedUnderlinePainter extends CustomPainter {
+  final Color color;
+  final double dotSize;
+  final double dotSpacing;
+
+  DottedUnderlinePainter({
+    required this.color,
+    required this.dotSize,
+    required this.dotSpacing,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = dotSize
+      ..strokeCap = StrokeCap.round;
+
+    double x = 0;
+    while (x < size.width) {
+      canvas.drawLine(
+        Offset(x, size.height / 2),
+        Offset(x, size.height / 2),
+        paint,
+      );
+      x += dotSpacing;
+    }
+  }
+
+  @override
+  bool shouldRepaint(DottedUnderlinePainter oldDelegate) {
+    return color != oldDelegate.color ||
+        dotSize != oldDelegate.dotSize ||
+        dotSpacing != oldDelegate.dotSpacing;
+  }
 }
