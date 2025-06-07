@@ -1321,8 +1321,9 @@ class ToolbarActions {
 
           // Always set underline and color
           newAttributes['underline'] = true;
-          newAttributes['underlineColor'] =
-              'FF${color.value.toRadixString(16).substring(2)}';
+          newAttributes['underlineColor'] = color == Colors.transparent
+              ? null
+              : 'FF${color.value.toRadixString(16).substring(2)}';
 
           // Keep existing style or use default
           if (opAttributes['underlineStyle'] == null) {
@@ -1411,15 +1412,23 @@ class ToolbarActions {
         if (selectedText.isNotEmpty) {
           final newAttributes = Map<String, dynamic>.from(opAttributes);
 
-          // Always set underline and style
-          newAttributes['underline'] = true;
-          newAttributes['underlineStyle'] = style;
+          if (style == 'none') {
+            // Remove underline completely
+            newAttributes.remove('underline');
+            newAttributes.remove('underlineStyle');
+            newAttributes.remove('underlineColor');
+          } else {
+            // Set underline and style
+            newAttributes['underline'] = true;
+            newAttributes['underlineStyle'] = style;
 
-          // Keep existing color or use default
-          if (opAttributes['underlineColor'] == null) {
-            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-            newAttributes['underlineColor'] =
-                isDarkMode ? 'FFFFFFFF' : 'FF000000';
+            // Keep existing color or use default
+            if (opAttributes['underlineColor'] == null) {
+              final isDarkMode =
+                  Theme.of(context).brightness == Brightness.dark;
+              newAttributes['underlineColor'] =
+                  isDarkMode ? 'FFFFFFFF' : 'FF000000';
+            }
           }
 
           print('New attributes for selected text: $newAttributes');
@@ -1710,7 +1719,7 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
               children: [
                 // Title row with done button
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 0, 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1734,6 +1743,12 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                       ),
                     ],
                   ),
+                ),
+                Divider(
+                  height: 1,
+                  color: isDarkMode
+                      ? Colors.white.withAlpha(26)
+                      : Colors.black.withAlpha(26),
                 ),
                 const SizedBox(height: 16),
                 // Underline section
@@ -1789,9 +1804,25 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                             // Underline reset button
                             GestureDetector(
                               onTap: () {
-                                setState(() => selectedUnderlineColor = -1);
-                                widget.onUnderlineColorChanged(
-                                    Colors.transparent);
+                                if (selectedUnderlineStyle == 'solid') {
+                                  // If it's a solid underline, remove it completely
+                                  setState(() {
+                                    selectedUnderlineColor = -1;
+                                    selectedUnderlineStyle = 'none';
+                                  });
+                                  widget.onUnderlineColorChanged(
+                                      Colors.transparent);
+                                  widget.onUnderlineStyleChanged('none');
+                                } else {
+                                  // Add normal underline
+                                  setState(() {
+                                    selectedUnderlineColor = -1;
+                                    selectedUnderlineStyle = 'solid';
+                                  });
+                                  widget.onUnderlineColorChanged(
+                                      Colors.transparent);
+                                  widget.onUnderlineStyleChanged('solid');
+                                }
                               },
                               child: Container(
                                 width: finalSize,
@@ -1800,33 +1831,29 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                                     const EdgeInsets.symmetric(horizontal: 1),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                    color: selectedUnderlineColor == -1
+                                    color: selectedUnderlineStyle == 'solid' &&
+                                            selectedUnderlineColor == -1
                                         ? isDarkMode
                                             ? Colors.white
                                             : Colors.black
                                         : Theme.of(context)
                                             .dividerColor
                                             .withAlpha(26),
-                                    width: selectedUnderlineColor == -1 ? 2 : 1,
+                                    width: selectedUnderlineStyle == 'solid' &&
+                                            selectedUnderlineColor == -1
+                                        ? 2
+                                        : 1,
                                   ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Center(
-                                  child: selectedUnderlineColor == -1
-                                      ? Icon(
-                                          Icons.check,
-                                          color: isDarkMode
-                                              ? Colors.white
-                                              : Colors.black,
-                                          size: finalSize * 0.5,
-                                        )
-                                      : Icon(
-                                          Icons.format_color_reset,
-                                          color: Theme.of(context)
-                                              .dividerColor
-                                              .withAlpha(128),
-                                          size: finalSize * 0.5,
-                                        ),
+                                  child: Icon(
+                                    Icons.text_format,
+                                    color: isDarkMode
+                                        ? Colors.white
+                                        : Colors.black,
+                                    size: finalSize * 0.6,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1835,12 +1862,17 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                               return _ColorOption(
                                 color: currentUnderlineColors[i],
                                 label: 'U',
-                                selected: selectedUnderlineColor == i,
+                                selected: selectedUnderlineColor == i &&
+                                    selectedUnderlineStyle == 'solid',
                                 isUnderline: true,
                                 onTap: () {
-                                  setState(() => selectedUnderlineColor = i);
+                                  setState(() {
+                                    selectedUnderlineColor = i;
+                                    selectedUnderlineStyle = 'solid';
+                                  });
                                   widget.onUnderlineColorChanged(
                                       currentUnderlineColors[i]);
+                                  widget.onUnderlineStyleChanged('solid');
                                 },
                               );
                             }),
@@ -2021,6 +2053,8 @@ class _ColorPickerBottomSheetState extends State<_ColorPickerBottomSheet> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
+                // Add bottom padding
                 const SizedBox(height: 24),
               ],
             ),
