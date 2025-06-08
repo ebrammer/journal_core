@@ -71,10 +71,27 @@ class ToolbarButtons {
     }
 
     // Determine indent/outdent permissions
-    // Can indent if not the first child at any level
-    final canIndent = !isFirstChild;
-    // Can outdent if it's a child node (not top level) and either not the first child or it's not the top level
-    final canOutdent = isChildNode && (!isFirstChild || !isTopLevel);
+    // Only show indent/outdent for list items
+    final isListItem = ['todo_list', 'bulleted_list', 'numbered_list']
+        .contains(toolbarState.currentBlockType);
+
+    // Check if there's a previous list item of the same type at root level
+    bool hasPreviousListItem = false;
+    if (isListItem &&
+        isTopLevel &&
+        !isFirstChild &&
+        toolbarState.currentSelectionPath != null) {
+      final currentIndex = toolbarState.currentSelectionPath!.last;
+      final previousPath = [currentIndex - 1];
+      final previousNode = editorState.getNodeAtPath(previousPath);
+      hasPreviousListItem = previousNode != null &&
+          previousNode.type == toolbarState.currentBlockType;
+    }
+
+    final canIndent =
+        isListItem && !isFirstChild && (!isTopLevel || hasPreviousListItem);
+    final canOutdent =
+        isListItem && isChildNode && (!isFirstChild || !isTopLevel);
 
     Log.info(
         '🔧 Position info: isTopLevel: $isTopLevel, isChildNode: $isChildNode, isFirstChild: $isFirstChild, canIndent: $canIndent, canOutdent: $canOutdent');
@@ -125,13 +142,13 @@ class ToolbarButtons {
           return active;
         },
       ),
-      if (canIndentNode)
+      if (isListItem)
         ToolbarButtonConfig(
           key: 'outdent',
           icon: JournalIcons.jtextOutdent,
           onPressed: canOutdent ? () => actions.handleOutdent() : null,
         ),
-      if (canIndentNode)
+      if (isListItem)
         ToolbarButtonConfig(
           key: 'indent',
           icon: JournalIcons.jtextIndent,

@@ -536,101 +536,110 @@ class ToolbarActions {
 
   void handleIndent() {
     final selection = editorState.selection;
-    if (selection == null) return;
-    final node = editorState.getNodeAtPath(selection.start.path);
-    if (node == null) return;
-    if (![
-      BlockTypeConstants.paragraph,
-      BlockTypeConstants.heading,
-      'todo_list',
-      'bulleted_list',
-      'numbered_list'
-    ].contains(node.type)) {
+    if (selection == null) {
+      Log.info('🔍 Indent: No selection');
       return;
     }
+    final node = editorState.getNodeAtPath(selection.start.path);
+    if (node == null) {
+      Log.info('🔍 Indent: No node at path ${selection.start.path}');
+      return;
+    }
+
+    // Only allow indentation for list items
+    if (![
+      BlockTypeConstants.todoList,
+      BlockTypeConstants.bulletedList,
+      BlockTypeConstants.numberedList
+    ].contains(node.type)) {
+      Log.info('🔍 Indent: Node type ${node.type} not allowed for indent');
+      return;
+    }
+
     final currentPath = selection.start.path;
     final currentIndex = currentPath.last;
     final parentPath = currentPath.length > 1
         ? currentPath.sublist(0, currentPath.length - 1)
         : <int>[];
 
-    if (currentPath.length >= 3) {
-      Log.info(
-          '🔍 Indent blocked: Maximum indent level 2 reached at path $currentPath');
-      return;
-    }
+    Log.info(
+        '🔍 Indent: Node type: ${node.type}, currentPath: $currentPath, parentPath: $parentPath, currentIndex: $currentIndex');
 
     final savedSelection = selection;
     final hadFocus = focusNode?.hasFocus ?? false;
-
     final transaction = editorState.transaction;
 
-    // If we're at the root level, create a new parent node
+    // Block indent if at root level and first block
+    if (currentPath.length == 1 && currentIndex == 0) {
+      Log.info('🔍 Indent blocked: First block at root cannot indent');
+      return;
+    }
+
     if (currentPath.length == 1) {
-      // Create a new parent node of the same type
-      final parentNode = Node(
-        type: node.type,
-        attributes: {
-          'delta': [
-            {'insert': ''}
-          ]
-        },
-        children: [],
-      );
-
-      // Insert the parent node at the current position
-      transaction.insertNode(Path.from([currentIndex]), parentNode);
-
-      // Move the current node to be a child of the new parent
-      transaction.deleteNode(node);
-      transaction.insertNode(Path.from([currentIndex, 0]), node);
-    } else {
-      // Normal indentation logic for nested items
-      List<int>? previousPath;
-      Node? previousNode;
-      if (currentIndex > 0) {
-        previousPath = [...parentPath, currentIndex - 1];
-        previousNode = editorState.getNodeAtPath(previousPath);
-      }
-      if (previousNode == null && currentPath.length > 1) {
-        previousPath = parentPath;
-        previousNode = editorState.getNodeAtPath(parentPath);
-      }
+      // At root level
+      final previousPath = [currentIndex - 1];
+      final previousNode = editorState.getNodeAtPath(previousPath);
       if (previousNode == null) {
+        Log.info('🔍 Indent blocked: No previous sibling at root');
+        return;
+      }
+
+      // List items can only indent under same type
+      if (node.type != previousNode.type) {
         Log.info(
-            '🔍 Indent blocked: No previous sibling or parent at path $currentPath');
+            '🔍 Indent blocked: List item can only indent under same type');
         return;
       }
 
       transaction.deleteNode(node);
-      final newPath = [...previousPath!, previousNode.children.length];
+      final newPath = [...previousPath, previousNode.children.length];
       transaction.insertNode(Path.from(newPath), node);
+      editorState.apply(transaction);
+      editorState.selection = Selection.single(
+        path: newPath,
+        startOffset: savedSelection.start.offset,
+      );
+      Log.info('🔍 Indented list item from $currentPath to $newPath');
+      if (hadFocus && focusNode != null) {
+        focusNode!.requestFocus();
+      }
+      return;
     }
 
-    editorState.apply(transaction);
+    // For nested list items
+    if (currentIndex > 0) {
+      final previousPath = [...parentPath, currentIndex - 1];
+      final previousNode = editorState.getNodeAtPath(previousPath);
+      Log.info(
+          '🔍 Indent: Previous sibling path: $previousPath, node: ${previousNode?.type}');
 
-    // Update selection to the new position
-    final newPath = currentPath.length == 1
-        ? [currentIndex, 0] // If we created a new parent, select the child
-        : [
-            ...parentPath,
-            currentIndex - 1,
-            0
-          ]; // If we moved to a sibling, select its first child
+      if (previousNode != null) {
+        // List items can only indent under same type
+        if (node.type != previousNode.type) {
+          Log.info(
+              '🔍 Indent blocked: List item can only indent under same type');
+          return;
+        }
 
-    editorState.selection = Selection.single(
-      path: newPath,
-      startOffset: savedSelection.start.offset,
-    );
-
-    Log.info(
-        '🔍 Indented node from path $currentPath to $newPath, transaction applied');
-    Log.info(
-        '🔍 Document state after indent: ${editorState.document.toJson()}');
-
-    if (hadFocus && focusNode != null) {
-      focusNode!.requestFocus();
+        transaction.deleteNode(node);
+        final newPath = [...previousPath, previousNode.children.length];
+        transaction.insertNode(Path.from(newPath), node);
+        editorState.apply(transaction);
+        editorState.selection = Selection.single(
+          path: newPath,
+          startOffset: savedSelection.start.offset,
+        );
+        Log.info(
+            '🔍 Indented nested list item from path $currentPath to $newPath');
+        if (hadFocus && focusNode != null) {
+          focusNode!.requestFocus();
+        }
+        return;
+      }
     }
+
+    Log.info(
+        '🔍 Indent blocked: No valid indentation target found at path $currentPath');
   }
 
   void handleOutdent() {

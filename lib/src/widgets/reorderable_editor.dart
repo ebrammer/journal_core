@@ -290,6 +290,8 @@ class ReorderableEditorState extends State<ReorderableEditor> {
   Widget _buildBlock(_BlockEntry entry) {
     final isSelected = entry.path.join() == widget.selectedBlockPath?.join();
     final indent = entry.depth * 16.0;
+    final additionalIndent =
+        (entry.node.attributes['indent'] as int? ?? 0) * 16.0;
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
     // Base style for fallback rendering
@@ -359,18 +361,32 @@ class ReorderableEditorState extends State<ReorderableEditor> {
           );
         }
       } else {
-        final text = entry.node.attributes['text'] as String? ??
-            entry.node.attributes['content'] as String? ??
-            '[${entry.node.type}]';
-        TextStyle style = baseStyle;
-        if (entry.node.type == 'scripture_block') {
-          style = style.copyWith(fontStyle: FontStyle.italic);
-        } else if (entry.node.type == 'title_block') {
-          style = style.copyWith(fontSize: 18, fontWeight: FontWeight.bold);
+        // Fallback to RichText for unknown block types
+        final delta = entry.node.delta ?? Delta();
+        final textSpans = <TextSpan>[];
+        for (final op in delta.toJson()) {
+          final text = op['insert'] as String? ?? '';
+          final attributes = op['attributes'] as Map<String, dynamic>? ?? {};
+          TextStyle style = baseStyle;
+          if (attributes['bold'] == true) {
+            style = style.copyWith(fontWeight: FontWeight.bold);
+          }
+          if (attributes['italic'] == true) {
+            style = style.copyWith(fontStyle: FontStyle.italic);
+          }
+          if (attributes['underline'] == true) {
+            style = style.copyWith(decoration: TextDecoration.underline);
+          }
+          if (attributes['strikethrough'] == true) {
+            style = style.copyWith(decoration: TextDecoration.lineThrough);
+          }
+          textSpans.add(TextSpan(text: text, style: style));
         }
-        child = Text(
-          text,
-          style: style,
+        child = RichText(
+          text: TextSpan(
+            children: textSpans,
+            style: baseStyle,
+          ),
         );
       }
     }
@@ -380,58 +396,25 @@ class ReorderableEditorState extends State<ReorderableEditor> {
       return IntrinsicHeight(
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 2.0),
-          padding: EdgeInsets.fromLTRB(indent + 6, 8, 6, 4),
+          padding: EdgeInsets.fromLTRB(indent + additionalIndent + 6, 8, 6, 4),
           child: child,
         ),
       );
     }
 
-    // Wrap the block content in IgnorePointer to prevent editing in reorder mode
-    final blockContent = IgnorePointer(
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          textTheme: Theme.of(context).textTheme.apply(
-                bodyColor: theme.primaryText,
-                displayColor: theme.primaryText,
-              ),
-        ),
-        child: child,
-      ),
-    );
-
     return GestureDetector(
-      key: ValueKey(
-          'reorderable_block_${entry.path.join("_")}_${entry.node.id}'),
       onTap: () {
-        if (entry.path.join() != widget.selectedBlockPath?.join()) {
-          _onBlockSelected(entry.path);
-        }
+        widget.onBlockSelected(entry.path);
       },
-      child: Container(
-        padding: EdgeInsets.fromLTRB(indent + 14, 8, 16, 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.selectionBorder.withAlpha((0.05 * 255).round())
-              : Colors.transparent,
-          border: Border.all(
-            color: isSelected ? theme.selectionBorder : Colors.transparent,
-            width: isSelected ? 1 : 0,
+      child: IntrinsicHeight(
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 2.0),
+          padding: EdgeInsets.fromLTRB(indent + additionalIndent + 6, 8, 6, 4),
+          decoration: BoxDecoration(
+            color: isSelected ? theme.secondaryBackground : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
           ),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            textSelectionTheme: TextSelectionThemeData(
-              cursorColor: Colors.transparent,
-              selectionColor: Colors.transparent,
-              selectionHandleColor: Colors.transparent,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [blockContent],
-          ),
+          child: child,
         ),
       ),
     );
