@@ -293,12 +293,17 @@ class ReorderableEditorState extends State<ReorderableEditor> {
     final additionalIndent =
         (entry.node.attributes['indent'] as int? ?? 0) * 16.0;
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
+    final textColor =
+        Theme.of(context).textTheme.bodyLarge?.color ?? theme.primaryText;
+
+    Log.info(
+        '🎨 Theme changed - Brightness: ${Theme.of(context).brightness}, Text color: $textColor');
 
     // Base style for fallback rendering
     final baseStyle = TextStyle(
       fontSize: 16,
       height: 1.5,
-      color: theme.primaryText,
+      color: textColor,
     );
 
     Widget child;
@@ -403,16 +408,22 @@ class ReorderableEditorState extends State<ReorderableEditor> {
     }
 
     return GestureDetector(
+      key: ValueKey('block_${entry.node.id}'),
       onTap: () {
         widget.onBlockSelected(entry.path);
       },
       child: IntrinsicHeight(
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 2.0),
-          padding: EdgeInsets.fromLTRB(indent + additionalIndent + 6, 8, 6, 4),
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          padding: EdgeInsets.fromLTRB(indent + additionalIndent + 8, 8, 8, 8),
           decoration: BoxDecoration(
-            color: isSelected ? theme.secondaryBackground : Colors.transparent,
+            color: isSelected
+                ? theme.secondaryBackground.withAlpha(128)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(4),
+            border: isSelected
+                ? Border.all(color: const Color(0xFF317FFF), width: 1)
+                : null,
           ),
           child: child,
         ),
@@ -428,7 +439,7 @@ class ReorderableEditorState extends State<ReorderableEditor> {
         final double scale = lerpDouble(1, 1, animValue)!;
         return Material(
           color: Colors.transparent,
-          shadowColor: Colors.black.withOpacity(0.3),
+          shadowColor: Colors.black.withAlpha(77),
           borderRadius: BorderRadius.circular(6),
           child: Transform.scale(
             scale: scale,
@@ -445,6 +456,8 @@ class ReorderableEditorState extends State<ReorderableEditor> {
 
   @override
   Widget build(BuildContext context) {
+    Log.info(
+        '🏗️ ReorderableEditor build called - Brightness: ${Theme.of(context).brightness}');
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     final children = widget.editorState.document.root.children;
     final metadataBlock =

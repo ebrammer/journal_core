@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'dart:math';
 import 'package:journal_core/src/toolbar/toolbar_actions.dart';
+import 'package:journal_core/src/theme/journal_theme.dart';
 
 /// Globally accessible editor state & focus for components that can't access context.
 class EditorGlobals {
@@ -131,8 +132,12 @@ TextSpan defaultTextSpanDecoratorForAttribute(
   // Create spans for each part
   final spans = <TextSpan>[];
 
+  // Get the theme-aware text color
+  final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
+
   // Apply attributes to the text
-  var style = before.style ?? const TextStyle();
+  var style = before.style?.copyWith(color: theme.primaryText) ??
+      TextStyle(color: theme.primaryText);
   if (attributes != null) {
     if (attributes['bold'] == true) {
       style = style.copyWith(fontWeight: FontWeight.bold);
