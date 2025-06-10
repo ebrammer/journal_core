@@ -78,21 +78,9 @@ class _JournalToolbarState extends State<JournalToolbar> {
   Widget build(BuildContext context) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     final toolbarState = context.watch<ToolbarState>();
-    Log.info(
-        '🔧 Toolbar rendering with block type: ${toolbarState.currentBlockType}, isDragMode: ${toolbarState.isDragMode}');
-
-    if (!toolbarState.isVisible) {
-      Log.info('🔧 Toolbar: Not visible');
-      return const SizedBox.shrink();
-    }
-
-    // Check clipboard content when toolbar is visible
-    _checkClipboardContent(toolbarState);
-
     final isSubMenu = toolbarState.showTextStyles ||
         toolbarState.showInsertMenu ||
-        toolbarState.showLayoutMenu ||
-        toolbarState.isDragMode;
+        toolbarState.showLayoutMenu;
 
     Log.info(
         '🔧 Toolbar state: isSubMenu=$isSubMenu, showTextStyles=${toolbarState.showTextStyles}, showInsertMenu=${toolbarState.showInsertMenu}, showLayoutMenu=${toolbarState.showLayoutMenu}, isDragMode=${toolbarState.isDragMode}');
@@ -108,7 +96,8 @@ class _JournalToolbarState extends State<JournalToolbar> {
                 (toolbarState.currentBlockType == BlockTypeConstants.divider) ||
                         (widget.editorState.selection != null &&
                             !widget.editorState.selection!.isCollapsed) ||
-                        toolbarState.isDragMode
+                        toolbarState.isDragMode ||
+                        toolbarState.showColorPicker
                     ? Alignment.center
                     : Alignment.centerLeft,
             child: Container(
@@ -184,36 +173,6 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         ),
                       if (toolbarState.hasClipboardContent)
                         const SizedBox(width: 8),
-                      // _buildInsertPill(
-                      //   icon: JournalIcons.jfire,
-                      //   label: 'Prayer',
-                      //   onTap: () async {
-                      //     if (widget.onPrayer != null) {
-                      //       await widget.onPrayer!();
-                      //     }
-                      //   },
-                      // ),
-                      // const SizedBox(width: 8),
-                      // _buildInsertPill(
-                      //   icon: JournalIcons.jbibleregular,
-                      //   label: 'Scripture',
-                      //   onTap: () async {
-                      //     if (widget.onScripture != null) {
-                      //       await widget.onScripture!();
-                      //     }
-                      //   },
-                      // ),
-                      // const SizedBox(width: 8),
-                      // _buildInsertPill(
-                      //   icon: JournalIcons.jtag,
-                      //   label: 'Tag',
-                      //   onTap: () async {
-                      //     if (widget.onTag != null) {
-                      //       await widget.onTag!();
-                      //     }
-                      //   },
-                      // ),
-                      // const SizedBox(width: 8),
                       _buildInsertPill(
                         icon: JournalIcons.jminus,
                         label: 'Divider',
@@ -268,6 +227,10 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         // Ensure a selection exists to keep toolbar visible
                         if (toolbarState.isDragMode) {
                           widget.controller.ensureValidSelection();
+                          // Hide color picker when entering drag mode
+                          toolbarState.showColorPicker = false;
+                          toolbarState.colorPickerWidget = null;
+                          toolbarState.setVisualSelection(null);
                           Log.info(
                               '🔍 Drag mode entered, selection: ${widget.editorState.selection}');
                         }
@@ -287,7 +250,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const SizedBox(width: 4.0),
-                        ..._getCurrentMenuButtons(),
+                        ..._buildToolbarButtons(),
                       ],
                     ),
                   ),
@@ -314,6 +277,12 @@ class _JournalToolbarState extends State<JournalToolbar> {
                           widget.focusNode.unfocus();
                           // Clear the selection to hide the cursor
                           widget.editorState.selection = null;
+                          // Clean up color picker if it's open
+                          if (toolbarState.showColorPicker) {
+                            toolbarState.showColorPicker = false;
+                            toolbarState.colorPickerWidget = null;
+                            toolbarState.setVisualSelection(null);
+                          }
                           // Hide the toolbar
                           widget.controller.toolbarState.setSelectionInfo(
                             isVisible: false,
@@ -339,12 +308,16 @@ class _JournalToolbarState extends State<JournalToolbar> {
               ],
             ),
           ),
+          // Color picker column
+          if (toolbarState.showColorPicker &&
+              toolbarState.colorPickerWidget != null)
+            toolbarState.colorPickerWidget!,
         ],
       ),
     );
   }
 
-  List<Widget> _getCurrentMenuButtons() {
+  List<Widget> _buildToolbarButtons() {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
     final toolbarState = context.watch<ToolbarState>();
     if (toolbarState.isDragMode) {

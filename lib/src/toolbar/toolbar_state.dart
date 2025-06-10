@@ -3,6 +3,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:journal_core/journal_core.dart';
 import '../models/block_type_constants.dart';
+import 'package:flutter/material.dart';
+import 'package:appflowy_editor/appflowy_editor.dart';
 
 class ToolbarState extends ChangeNotifier {
   bool isVisible = false;
@@ -11,6 +13,8 @@ class ToolbarState extends ChangeNotifier {
   bool showInsertMenu = false;
   bool showLayoutMenu = false;
   bool showActionsMenu = false; // Added for actions submenu
+  bool showColorPicker = false; // Added for color picker column
+  Widget? colorPickerWidget; // Added for color picker widget
   String currentBlockType = BlockTypeConstants.paragraph;
   int? headingLevel;
   bool isStyleBold = false;
@@ -22,6 +26,7 @@ class ToolbarState extends ChangeNotifier {
   bool hasClipboardContent = false;
   List<int>? currentSelectionPath;
   String? previousSiblingType;
+  Selection? visualSelection; // Added to track selection state
 
   ToolbarState();
 
@@ -75,6 +80,15 @@ class ToolbarState extends ChangeNotifier {
     this.isDragMode = isDragMode;
     currentSelectionPath = selectionPath;
     this.previousSiblingType = previousSiblingType;
+    notifyListeners();
+  }
+
+  void setVisualSelection(Selection? selection) {
+    visualSelection = selection;
+    // Only update showTextStyles if color picker is not open
+    if (!showColorPicker) {
+      showTextStyles = selection != null;
+    }
     notifyListeners();
   }
 }

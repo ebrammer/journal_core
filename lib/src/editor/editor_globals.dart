@@ -163,9 +163,16 @@ TextSpan defaultTextSpanDecoratorForAttribute(
         print(
             'TextSpanDecorator: Setting decoration style to: $decorationStyle');
 
+        // Get existing decorations
+        final existingDecorations = style.decoration ?? TextDecoration.none;
+        final newDecorations = TextDecoration.combine([
+          existingDecorations,
+          TextDecoration.underline,
+        ]);
+
         // Apply the style
         style = style.copyWith(
-          decoration: TextDecoration.underline,
+          decoration: newDecorations,
           decorationColor: color,
           decorationStyle: decorationStyle,
           decorationThickness: 1.0,
@@ -173,7 +180,13 @@ TextSpan defaultTextSpanDecoratorForAttribute(
       }
     }
     if (attributes['strikethrough'] == true) {
-      style = style.copyWith(decoration: TextDecoration.lineThrough);
+      // Get existing decorations
+      final existingDecorations = style.decoration ?? TextDecoration.none;
+      final newDecorations = TextDecoration.combine([
+        existingDecorations,
+        TextDecoration.lineThrough,
+      ]);
+      style = style.copyWith(decoration: newDecorations);
     }
     if (attributes['color'] != null) {
       final colorHex = attributes['color'] as String;
