@@ -91,114 +91,115 @@ class _JournalToolbarState extends State<JournalToolbar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Insert Menu
-          Align(
-            alignment:
-                (toolbarState.currentBlockType == BlockTypeConstants.divider) ||
-                        (widget.editorState.selection != null &&
-                            !widget.editorState.selection!.isCollapsed) ||
-                        toolbarState.isDragMode ||
-                        toolbarState.showColorPicker
-                    ? Alignment.center
-                    : Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.only(top: 0, bottom: 8.0),
-              decoration: const BoxDecoration(
-                color: Colors.transparent,
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisAlignment: (toolbarState.currentBlockType ==
-                              BlockTypeConstants.divider) ||
-                          (widget.editorState.selection != null &&
-                              !widget.editorState.selection!.isCollapsed) ||
-                          toolbarState.isDragMode
-                      ? MainAxisAlignment.center
-                      : MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(width: 8.0),
-                    if (toolbarState.isDragMode) ...[
-                      // Count valid blocks (excluding metadata and spacer blocks)
-                      Builder(
-                        builder: (context) {
-                          int validBlockCount = 0;
-                          for (final node
-                              in widget.editorState.document.root.children) {
-                            if (node != null &&
-                                node.type != 'spacer_block' &&
-                                node.type != 'metadata_block') {
-                              validBlockCount++;
+          if (!toolbarState.showColorPicker)
+            Align(
+              alignment: (toolbarState.currentBlockType ==
+                          BlockTypeConstants.divider) ||
+                      (widget.editorState.selection != null &&
+                          !widget.editorState.selection!.isCollapsed) ||
+                      toolbarState.isDragMode ||
+                      toolbarState.showColorPicker
+                  ? Alignment.center
+                  : Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.only(top: 0, bottom: 8.0),
+                decoration: const BoxDecoration(
+                  color: Colors.transparent,
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: (toolbarState.currentBlockType ==
+                                BlockTypeConstants.divider) ||
+                            (widget.editorState.selection != null &&
+                                !widget.editorState.selection!.isCollapsed) ||
+                            toolbarState.isDragMode
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 8.0),
+                      if (toolbarState.isDragMode) ...[
+                        // Count valid blocks (excluding metadata and spacer blocks)
+                        Builder(
+                          builder: (context) {
+                            int validBlockCount = 0;
+                            for (final node
+                                in widget.editorState.document.root.children) {
+                              if (node != null &&
+                                  node.type != 'spacer_block' &&
+                                  node.type != 'metadata_block') {
+                                validBlockCount++;
+                              }
                             }
-                          }
 
-                          // Only show delete button if there's more than one block
-                          if (validBlockCount > 1) {
-                            return _buildInsertPill(
-                              icon: JournalIcons.jxCircle,
-                              label: 'Delete Block',
-                              onTap: () => _actions.handleDelete(),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ] else if (toolbarState.currentBlockType ==
-                        BlockTypeConstants.divider)
-                      _buildInsertPill(
-                        icon: JournalIcons.jxCircle,
-                        label: 'Delete',
-                        onTap: () => _actions.handleDelete(),
-                      )
-                    else if (widget.editorState.selection != null &&
-                        !widget.editorState.selection!.isCollapsed) ...[
-                      _buildInsertPill(
-                        icon: JournalIcons.jcopy,
-                        label: 'Copy',
-                        onTap: () => _actions.handleCopyToClipboard(),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildInsertPill(
-                        icon: JournalIcons.jscissors,
-                        label: 'Cut',
-                        onTap: () => _actions.handleCutToClipboard(),
-                      ),
-                    ] else ...[
-                      if (toolbarState.hasClipboardContent)
-                        _buildInsertPill(
-                          icon: JournalIcons.jclipboard,
-                          label: 'Paste',
-                          onTap: () => _actions.handlePasteFromClipboard(),
+                            // Only show delete button if there's more than one block
+                            if (validBlockCount > 1) {
+                              return _buildInsertPill(
+                                icon: JournalIcons.jxCircle,
+                                label: 'Delete Block',
+                                onTap: () => _actions.handleDelete(),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
                         ),
-                      if (toolbarState.hasClipboardContent)
+                      ] else if (toolbarState.currentBlockType ==
+                          BlockTypeConstants.divider)
+                        _buildInsertPill(
+                          icon: JournalIcons.jxCircle,
+                          label: 'Delete',
+                          onTap: () => _actions.handleDelete(),
+                        )
+                      else if (widget.editorState.selection != null &&
+                          !widget.editorState.selection!.isCollapsed) ...[
+                        _buildInsertPill(
+                          icon: JournalIcons.jcopy,
+                          label: 'Copy',
+                          onTap: () => _actions.handleCopyToClipboard(),
+                        ),
                         const SizedBox(width: 8),
-                      _buildInsertPill(
-                        icon: JournalIcons.jminus,
-                        label: 'Divider',
-                        onTap: () => _actions.handleInsertDivider(),
-                        isActive: toolbarState.currentBlockType ==
-                            BlockTypeConstants.divider,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildInsertPill(
-                        icon: JournalIcons.jrowsPlusTop,
-                        label: 'Insert Above',
-                        onTap: () => _actions.handleInsertAbove(),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildInsertPill(
-                        icon: JournalIcons.jrowsPlusBottom,
-                        label: 'Insert Below',
-                        onTap: () => _actions.handleInsertBelow(),
-                      ),
+                        _buildInsertPill(
+                          icon: JournalIcons.jscissors,
+                          label: 'Cut',
+                          onTap: () => _actions.handleCutToClipboard(),
+                        ),
+                      ] else ...[
+                        if (toolbarState.hasClipboardContent)
+                          _buildInsertPill(
+                            icon: JournalIcons.jclipboard,
+                            label: 'Paste',
+                            onTap: () => _actions.handlePasteFromClipboard(),
+                          ),
+                        if (toolbarState.hasClipboardContent)
+                          const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jminus,
+                          label: 'Divider',
+                          onTap: () => _actions.handleInsertDivider(),
+                          isActive: toolbarState.currentBlockType ==
+                              BlockTypeConstants.divider,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jrowsPlusTop,
+                          label: 'Insert Above',
+                          onTap: () => _actions.handleInsertAbove(),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jrowsPlusBottom,
+                          label: 'Insert Below',
+                          onTap: () => _actions.handleInsertBelow(),
+                        ),
+                      ],
+                      const SizedBox(width: 8.0),
                     ],
-                    const SizedBox(width: 8.0),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
           // Main Toolbar
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -311,7 +312,15 @@ class _JournalToolbarState extends State<JournalToolbar> {
           // Color picker column
           if (toolbarState.showColorPicker &&
               toolbarState.colorPickerWidget != null)
-            toolbarState.colorPickerWidget!,
+            Column(
+              children: [
+                Divider(
+                  height: 1,
+                  color: theme.dividerColor.withAlpha(100),
+                ),
+                toolbarState.colorPickerWidget!,
+              ],
+            ),
         ],
       ),
     );
