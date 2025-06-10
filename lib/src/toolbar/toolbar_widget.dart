@@ -67,6 +67,16 @@ class _JournalToolbarState extends State<JournalToolbar> {
       onMoveUp: widget.onMoveUp,
       onMoveDown: widget.onMoveDown,
     );
+
+    // Check clipboard content when toolbar is initialized
+    _checkClipboardContent(widget.controller.toolbarState);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Check clipboard content when dependencies change (e.g., when toolbar becomes visible)
+    _checkClipboardContent(widget.controller.toolbarState);
   }
 
   @override
