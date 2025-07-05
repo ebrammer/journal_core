@@ -31,6 +31,8 @@ class EditorWidget extends StatefulWidget {
     this.onScripture,
     this.onTag,
     this.readOnly = false,
+    this.onContentTap,
+    this.onSaveOnly,
   });
 
   final Journal journal;
@@ -41,6 +43,9 @@ class EditorWidget extends StatefulWidget {
   final Future Function()? onScripture;
   final Future Function()? onTag;
   final bool readOnly;
+  final Future<void> Function()? onContentTap;
+  final Future<void> Function(Journal updatedJournal, String contentJson)?
+      onSaveOnly;
 
   @override
   State<EditorWidget> createState() => _EditorWidgetState();
@@ -63,6 +68,7 @@ class _EditorWidgetState extends State<EditorWidget> {
       GlobalKey<ReorderableEditorState>();
 
   bool _isMovingBlock = false;
+  bool _hasUnsavedChanges = false;
 
   bool _hasMeaningfulContent() {
     // Check if title is not empty
@@ -113,6 +119,7 @@ class _EditorWidgetState extends State<EditorWidget> {
         _editorState.selection = null;
       }
     });
+
     // Add a listener to check for updated journal content after initial load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForUpdatedContent();
@@ -250,6 +257,12 @@ class _EditorWidgetState extends State<EditorWidget> {
         _selectedBlockPath = newSelectedPath;
       });
     }
+    // Track unsaved changes
+    if (!_hasUnsavedChanges) {
+      setState(() {
+        _hasUnsavedChanges = true;
+      });
+    }
     _updateBlocks();
   }
 
@@ -269,6 +282,12 @@ class _EditorWidgetState extends State<EditorWidget> {
     Log.info('🔄 Selection changed to: ${_editorState.selection}');
     _controller.syncToolbarWithSelection();
     _updateSelectedBlockPath();
+    // Track unsaved changes when selection changes (indicates user interaction)
+    if (!_hasUnsavedChanges) {
+      setState(() {
+        _hasUnsavedChanges = true;
+      });
+    }
     if (mounted) {
       setState(() {
         _showDeleteFab = true;
@@ -307,10 +326,7 @@ class _EditorWidgetState extends State<EditorWidget> {
     if (widget.readOnly) {
       return ReadOnlyViewer(
         journal: widget.journal,
-        onContentTap: () {
-          // You can handle content tap here if needed
-          // For example, to show a modal, navigate, etc.
-        },
+        onContentTap: widget.onContentTap,
       );
     }
 
@@ -367,6 +383,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                         Log.info(
                             '🔍 Saving journal on back: ${updatedJournal.toJson()}');
                         await widget.onSave(updatedJournal, content);
+                        setState(() {
+                          _hasUnsavedChanges = false;
+                        });
                         await widget.onBack();
                       },
                       color: Theme.of(context).iconTheme.color,
@@ -411,6 +430,64 @@ class _EditorWidgetState extends State<EditorWidget> {
                         minHeight: 48,
                       ),
                       padding: const EdgeInsets.all(12.0),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(right: 8.0),
+                      child: ElevatedButton(
+                        onPressed: _hasUnsavedChanges
+                            ? () async {
+                                final content =
+                                    _controller.getDocumentContent();
+                                final updatedJournal = Journal(
+                                  id: widget.journal.id,
+                                  title: _currentTitle,
+                                  createdAt: widget.journal.createdAt,
+                                  lastModified:
+                                      DateTime.now().millisecondsSinceEpoch,
+                                  content: _editorState.document,
+                                );
+                                Log.info(
+                                    '🔍 Saving journal via save button: ${updatedJournal.toJson()}');
+                                // Always use onSaveOnly for the save button to avoid navigation
+                                if (widget.onSaveOnly != null) {
+                                  await widget.onSaveOnly!(
+                                      updatedJournal, content);
+                                } else {
+                                  // If no onSaveOnly provided, just save without any callback
+                                  // This prevents navigation when save button is pressed
+                                  Log.info(
+                                      '🔍 Save button pressed but no onSaveOnly callback provided');
+                                }
+                                setState(() {
+                                  _hasUnsavedChanges = false;
+                                });
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _hasUnsavedChanges
+                              ? theme.primaryText
+                              : theme.secondaryText.withValues(alpha: 0.3),
+                          foregroundColor: _hasUnsavedChanges
+                              ? theme.primaryBackground
+                              : theme.secondaryText,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 4.0,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20.0),
+                          ),
+                          minimumSize: const Size(60, 32),
+                        ),
+                        child: const Text(
+                          'Save',
+                          style: TextStyle(
+                            fontSize: 14.0,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

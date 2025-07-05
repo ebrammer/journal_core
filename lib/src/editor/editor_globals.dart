@@ -195,6 +195,9 @@ TextSpan defaultTextSpanDecoratorForAttribute(
       style = style.copyWith(color: color);
       print(
           'TextSpanDecorator: Applied text color: ${color.value.toRadixString(16)}');
+    } else {
+      // If no color attribute is present, use the theme's primary text color
+      style = style.copyWith(color: theme.primaryText);
     }
 
     // Handle background color

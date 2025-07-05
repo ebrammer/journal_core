@@ -50,7 +50,6 @@ class ColorPickerActions {
       final opText = op['insert'] as String;
       final opLength = opText.length;
       final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
-      print('Processing text: "$opText" with attributes: $opAttributes');
 
       if (currentOffset + opLength <= selection.start.offset ||
           currentOffset >= selection.end.offset) {
@@ -78,14 +77,11 @@ class ColorPickerActions {
         if (selectedText.isNotEmpty) {
           final newAttributes = Map<String, dynamic>.from(opAttributes);
           if (color == Colors.transparent) {
-            // When resetting, only remove text styling attributes
-            newAttributes.remove('color');
-            newAttributes.remove('bold');
-            newAttributes.remove('italic');
-            newAttributes.remove('underline');
-            newAttributes.remove('strike');
-            newAttributes.remove('underlineColor');
-            // Preserve background color
+            // When resetting, set to theme's primary text color
+            final theme =
+                JournalTheme.fromBrightness(Theme.of(context).brightness);
+            newAttributes['color'] =
+                theme.primaryText.value.toRadixString(16).padLeft(8, '0');
           } else {
             newAttributes['color'] =
                 color.value.toRadixString(16).padLeft(8, '0');
@@ -242,11 +238,13 @@ class ColorPickerActions {
       final opText = op['insert'] as String;
       final opLength = opText.length;
       final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
-      print('Processing text: "$opText" with attributes: $opAttributes');
 
       if (currentOffset + opLength <= selection.start.offset ||
           currentOffset >= selection.end.offset) {
-        newDelta.add(op);
+        newDelta.add({
+          'insert': opText,
+          'attributes': Map<String, dynamic>.from(opAttributes),
+        });
       } else {
         final beforeSelection =
             opText.substring(0, max(0, selection.start.offset - currentOffset));
@@ -270,23 +268,23 @@ class ColorPickerActions {
         if (selectedText.isNotEmpty) {
           final newAttributes = Map<String, dynamic>.from(opAttributes);
 
-          // Always set underline and color
+          // Set underline and color
           newAttributes['underline'] = true;
-          newAttributes['underlineColor'] = color == Colors.transparent
-              ? null
-              : 'FF${color.value.toRadixString(16).substring(2)}';
 
-          // Keep existing style or use default
-          if (opAttributes['underlineStyle'] == null) {
-            newAttributes['underlineStyle'] = 'solid';
-          }
-
-          // Keep existing color or use default
-          if (opAttributes['underlineColor'] == null) {
-            final theme =
-                JournalTheme.fromBrightness(Theme.of(context).brightness);
+          // If the color is transparent, remove the underline color
+          if (color == Colors.transparent) {
+            newAttributes.remove('underlineColor');
+            newAttributes.remove('underlineStyle');
+            newAttributes.remove('underline');
+          } else {
+            // Set the new underline color
             newAttributes['underlineColor'] =
-                theme.primaryText.value.toRadixString(16).padLeft(8, '0');
+                'FF${color.value.toRadixString(16).substring(2)}';
+
+            // Keep existing style or use default
+            if (opAttributes['underlineStyle'] == null) {
+              newAttributes['underlineStyle'] = 'solid';
+            }
           }
 
           print('New attributes for selected text: $newAttributes');

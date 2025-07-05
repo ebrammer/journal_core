@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/journal_core.dart';
 import '../theme/journal_theme.dart';
 import '../blocks/divider_block.dart' as divider;
@@ -13,7 +12,7 @@ class ReadOnlyViewer extends StatefulWidget {
   });
 
   final Journal journal;
-  final VoidCallback? onContentTap;
+  final Future<void> Function()? onContentTap;
 
   @override
   State<ReadOnlyViewer> createState() => _ReadOnlyViewerState();
@@ -21,13 +20,37 @@ class ReadOnlyViewer extends StatefulWidget {
 
 class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
   final ScrollController _scrollController = ScrollController();
-  late final Document _contentCopy;
+  late final List<Map<String, dynamic>> _contentBlocks;
 
   @override
   void initState() {
     super.initState();
-    // Create a deep copy of the document to prevent disposal issues
-    _contentCopy = Document.fromJson(widget.journal.content.toJson());
+    // Extract content data as plain objects to prevent disposal issues
+    _contentBlocks = _extractContentData();
+  }
+
+  List<Map<String, dynamic>> _extractContentData() {
+    final children = widget.journal.content.root.children;
+    final blocks = <Map<String, dynamic>>[];
+
+    for (final node in children) {
+      // Skip metadata and spacer blocks
+      if (node.type == BlockTypeConstants.metadata ||
+          node.type == BlockTypeConstants.spacer) {
+        continue;
+      }
+
+      // Extract node data as plain objects
+      final blockData = {
+        'type': node.type,
+        'attributes': Map<String, dynamic>.from(node.attributes),
+        'id': node.id,
+      };
+
+      blocks.add(blockData);
+    }
+
+    return blocks;
   }
 
   @override
@@ -43,7 +66,11 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     return Container(
       color: theme.primaryBackground,
       child: GestureDetector(
-        onTap: widget.onContentTap,
+        onTap: () async {
+          if (widget.onContentTap != null) {
+            await widget.onContentTap!();
+          }
+        },
         child: SingleChildScrollView(
           controller: _scrollController,
           child: Padding(
@@ -56,42 +83,39 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
   }
 
   Widget _buildContent() {
-    final children = _contentCopy.root.children;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Content blocks (skip metadata and spacer blocks)
-        ...children
-            .where((node) =>
-                node.type != BlockTypeConstants.metadata &&
-                node.type != BlockTypeConstants.spacer)
-            .map((node) => _buildBlock(node)),
+        // Content blocks using extracted data
+        ..._contentBlocks.map((blockData) => _buildBlock(blockData)),
       ],
     );
   }
 
-  Widget _buildBlock(Node node) {
-    switch (node.type) {
+  Widget _buildBlock(Map<String, dynamic> blockData) {
+    final type = blockData['type'] as String;
+
+    switch (type) {
       case BlockTypeConstants.paragraph:
-        return _buildParagraphBlock(node);
+        return _buildParagraphBlock(blockData);
       case divider.DividerBlockKeys.type:
-        return _buildDividerBlock(node);
+        return _buildDividerBlock(blockData);
       case BlockTypeConstants.heading:
-        return _buildHeadingBlock(node);
+        return _buildHeadingBlock(blockData);
       case BlockTypeConstants.bulletedList:
       case BlockTypeConstants.numberedList:
-        return _buildListBlock(node);
+        return _buildListBlock(blockData);
       case BlockTypeConstants.quote:
-        return _buildQuoteBlock(node);
+        return _buildQuoteBlock(blockData);
       default:
-        return _buildUnknownBlock(node);
+        return _buildUnknownBlock(blockData);
     }
   }
 
-  Widget _buildParagraphBlock(Node node) {
+  Widget _buildParagraphBlock(Map<String, dynamic> blockData) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
-    final delta = node.attributes['delta'] as List<dynamic>?;
+    final attributes = blockData['attributes'] as Map<String, dynamic>;
+    final delta = attributes['delta'] as List<dynamic>?;
 
     if (delta == null || delta.isEmpty) {
       return const SizedBox(height: 16.0);
@@ -101,7 +125,7 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
 
     for (final op in delta) {
       final text = op['insert'] as String? ?? '';
-      final attributes = op['attributes'] as Map<String, dynamic>? ?? {};
+      final opAttributes = op['attributes'] as Map<String, dynamic>? ?? {};
 
       TextStyle style = TextStyle(
         fontSize: 16,
@@ -110,16 +134,16 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
       );
 
       // Apply text styling
-      if (attributes['bold'] == true) {
+      if (opAttributes['bold'] == true) {
         style = style.copyWith(fontWeight: FontWeight.bold);
       }
-      if (attributes['italic'] == true) {
+      if (opAttributes['italic'] == true) {
         style = style.copyWith(fontStyle: FontStyle.italic);
       }
-      if (attributes['underline'] == true) {
+      if (opAttributes['underline'] == true) {
         style = style.copyWith(decoration: TextDecoration.underline);
       }
-      if (attributes['strikethrough'] == true) {
+      if (opAttributes['strikethrough'] == true) {
         style = style.copyWith(decoration: TextDecoration.lineThrough);
       }
 
@@ -134,9 +158,10 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     );
   }
 
-  Widget _buildHeadingBlock(Node node) {
+  Widget _buildHeadingBlock(Map<String, dynamic> blockData) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
-    final delta = node.attributes['delta'] as List<dynamic>?;
+    final attributes = blockData['attributes'] as Map<String, dynamic>;
+    final delta = attributes['delta'] as List<dynamic>?;
 
     if (delta == null || delta.isEmpty) {
       return const SizedBox(height: 16.0);
@@ -145,7 +170,7 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     final text = delta.map((op) => op['insert'] as String? ?? '').join('');
 
     // Get heading level from attributes, default to 1
-    final level = node.attributes['level'] as int? ?? 1;
+    final level = attributes['level'] as int? ?? 1;
 
     double fontSize;
     FontWeight fontWeight;
@@ -182,16 +207,17 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     );
   }
 
-  Widget _buildListBlock(Node node) {
+  Widget _buildListBlock(Map<String, dynamic> blockData) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
-    final delta = node.attributes['delta'] as List<dynamic>?;
+    final attributes = blockData['attributes'] as Map<String, dynamic>;
+    final delta = attributes['delta'] as List<dynamic>?;
 
     if (delta == null || delta.isEmpty) {
       return const SizedBox(height: 16.0);
     }
 
     final text = delta.map((op) => op['insert'] as String? ?? '').join('');
-    final isNumbered = node.type == BlockTypeConstants.numberedList;
+    final isNumbered = blockData['type'] == BlockTypeConstants.numberedList;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -225,9 +251,10 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     );
   }
 
-  Widget _buildQuoteBlock(Node node) {
+  Widget _buildQuoteBlock(Map<String, dynamic> blockData) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
-    final delta = node.attributes['delta'] as List<dynamic>?;
+    final attributes = blockData['attributes'] as Map<String, dynamic>;
+    final delta = attributes['delta'] as List<dynamic>?;
 
     if (delta == null || delta.isEmpty) {
       return const SizedBox(height: 16.0);
@@ -241,7 +268,7 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
       decoration: BoxDecoration(
         border: Border(
           left: BorderSide(
-            color: theme.primaryText.withOpacity(0.3),
+            color: theme.primaryText.withValues(alpha: 0.3),
             width: 4.0,
           ),
         ),
@@ -260,7 +287,7 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     );
   }
 
-  Widget _buildDividerBlock(Node node) {
+  Widget _buildDividerBlock(Map<String, dynamic> blockData) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
     return Container(
@@ -275,7 +302,7 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     );
   }
 
-  Widget _buildUnknownBlock(Node node) {
+  Widget _buildUnknownBlock(Map<String, dynamic> blockData) {
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
     return Container(
@@ -284,10 +311,10 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
       decoration: BoxDecoration(
         color: theme.secondaryBackground,
         borderRadius: BorderRadius.circular(4.0),
-        border: Border.all(color: theme.secondaryText.withOpacity(0.3)),
+        border: Border.all(color: theme.secondaryText.withValues(alpha: 0.3)),
       ),
       child: Text(
-        'Unknown block type: ${node.type}',
+        'Unknown block type: ${blockData['type']}',
         style: TextStyle(
           fontSize: 14,
           color: theme.secondaryText,
