@@ -18,6 +18,7 @@ import '../editor/journal_editor_controller.dart';
 import '../toolbar/toolbar_state.dart';
 import '../toolbar/toolbar_widget.dart';
 import '../utils/logging.dart';
+import 'read_only_viewer.dart';
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
@@ -29,6 +30,7 @@ class EditorWidget extends StatefulWidget {
     this.onPrayer,
     this.onScripture,
     this.onTag,
+    this.readOnly = false,
   });
 
   final Journal journal;
@@ -38,6 +40,7 @@ class EditorWidget extends StatefulWidget {
   final Future Function()? onPrayer;
   final Future Function()? onScripture;
   final Future Function()? onTag;
+  final bool readOnly;
 
   @override
   State<EditorWidget> createState() => _EditorWidgetState();
@@ -300,6 +303,17 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // If in read-only mode, show the ReadOnlyViewer instead
+    if (widget.readOnly) {
+      return ReadOnlyViewer(
+        journal: widget.journal,
+        onContentTap: () {
+          // You can handle content tap here if needed
+          // For example, to show a modal, navigate, etc.
+        },
+      );
+    }
+
     if (_editorState == null) {
       print(
           '⚠️ [editor_widget] Editor state is null, showing loading indicator');

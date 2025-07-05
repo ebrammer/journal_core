@@ -38,6 +38,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  bool _isReadOnly = false;
+
   // Hardcoded journal list for demo
   List<Journal> _journals = [
     Journal(
@@ -80,33 +82,74 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Journal Core Example'),
         backgroundColor: theme.primaryBackground,
+        actions: [
+          // Toggle button to switch between edit and read-only modes
+          IconButton(
+            icon: Icon(_isReadOnly ? Icons.edit : Icons.visibility),
+            onPressed: () {
+              setState(() {
+                _isReadOnly = !_isReadOnly;
+              });
+            },
+            tooltip: _isReadOnly
+                ? 'Switch to Edit Mode'
+                : 'Switch to Read-Only Mode',
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: TextButton(
-                onPressed: () {
-                  final newJournal = Journal(
-                    id: 'journal-${DateTime.now().millisecondsSinceEpoch}',
-                    title: '',
-                    createdAt: DateTime.now().millisecondsSinceEpoch,
-                    lastModified: DateTime.now().millisecondsSinceEpoch,
-                    content: Document.fromJson(jsonDecode(
-                        '{"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":""}]}}]}}')),
-                  );
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => EditorScreen(
-                        journal: newJournal,
-                        onJournalSaved: _addJournal,
-                        onJournalDeleted: _removeJournal,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        final newJournal = Journal(
+                          id: 'journal-${DateTime.now().millisecondsSinceEpoch}',
+                          title: '',
+                          createdAt: DateTime.now().millisecondsSinceEpoch,
+                          lastModified: DateTime.now().millisecondsSinceEpoch,
+                          content: Document.fromJson(jsonDecode(
+                              '{"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":""}]}}]}}')),
+                        );
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => EditorScreen(
+                              journal: newJournal,
+                              onJournalSaved: _addJournal,
+                              onJournalDeleted: _removeJournal,
+                              readOnly: _isReadOnly,
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('Create New Journal'),
+                    ),
+                  ),
+                  const SizedBox(width: 16.0),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 6.0),
+                    decoration: BoxDecoration(
+                      color: _isReadOnly
+                          ? Colors.orange.withOpacity(0.2)
+                          : Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16.0),
+                    ),
+                    child: Text(
+                      _isReadOnly ? 'Read-Only' : 'Edit Mode',
+                      style: TextStyle(
+                        color: _isReadOnly
+                            ? Colors.orange[700]
+                            : Colors.green[700],
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  );
-                },
-                child: const Text('Create New Journal'),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -128,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             journal: journal,
                             onJournalSaved: _addJournal,
                             onJournalDeleted: _removeJournal,
+                            readOnly: _isReadOnly,
                           ),
                         ),
                       );
@@ -147,12 +191,14 @@ class EditorScreen extends StatelessWidget {
   final Journal journal;
   final void Function(Journal journal) onJournalSaved;
   final void Function(String journalId) onJournalDeleted;
+  final bool readOnly;
 
   const EditorScreen({
     super.key,
     required this.journal,
     required this.onJournalSaved,
     required this.onJournalDeleted,
+    this.readOnly = false,
   });
 
   @override
@@ -162,6 +208,7 @@ class EditorScreen extends StatelessWidget {
       backgroundColor: theme.primaryBackground,
       body: EditorWidget(
         journal: journal,
+        readOnly: readOnly,
         onSave: (updatedJournal, _) async {
           debugPrint("Saved: ${updatedJournal.toJson()}");
           onJournalSaved(updatedJournal);
@@ -170,30 +217,24 @@ class EditorScreen extends StatelessWidget {
           }
         },
         onBack: () async {
-          // Save before navigating back, similar to Steadfast
-          final content = JournalEditorController(
-            editorState: EditorState(document: journal.content),
-            toolbarState: ToolbarState(),
-          ).getDocumentContent();
-          final updatedJournal = Journal(
-            id: journal.id,
-            title: journal.title,
-            createdAt: journal.createdAt,
-            lastModified: DateTime.now().millisecondsSinceEpoch,
-            content: Document.fromJson(jsonDecode(content)),
-          );
-          debugPrint("Saved on back: ${updatedJournal.toJson()}");
-          onJournalSaved(updatedJournal);
           if (Navigator.canPop(context)) {
             Navigator.of(context).pop();
           }
         },
         onDelete: () async {
-          debugPrint("Deleted journal: ${journal.id}");
           onJournalDeleted(journal.id);
           if (Navigator.canPop(context)) {
             Navigator.of(context).pop();
           }
+        },
+        onPrayer: () async {
+          debugPrint("Adding prayer block");
+        },
+        onScripture: () async {
+          debugPrint("Adding scripture block");
+        },
+        onTag: () async {
+          debugPrint("Adding tag");
         },
       ),
     );
