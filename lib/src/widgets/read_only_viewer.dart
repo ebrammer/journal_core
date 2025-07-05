@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:journal_core/journal_core.dart';
 import '../theme/journal_theme.dart';
 import '../blocks/divider_block.dart' as divider;
@@ -34,9 +35,8 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     final blocks = <Map<String, dynamic>>[];
 
     for (final node in children) {
-      // Skip metadata and spacer blocks
-      if (node.type == BlockTypeConstants.metadata ||
-          node.type == BlockTypeConstants.spacer) {
+      // Skip spacer blocks but include metadata blocks for title and date
+      if (node.type == BlockTypeConstants.spacer) {
         continue;
       }
 
@@ -96,6 +96,8 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
     final type = blockData['type'] as String;
 
     switch (type) {
+      case BlockTypeConstants.metadata:
+        return _buildMetadataBlock(blockData);
       case BlockTypeConstants.paragraph:
         return _buildParagraphBlock(blockData);
       case divider.DividerBlockKeys.type:
@@ -110,6 +112,45 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
       default:
         return _buildUnknownBlock(blockData);
     }
+  }
+
+  Widget _buildMetadataBlock(Map<String, dynamic> blockData) {
+    final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
+
+    // Get the title from the journal
+    final title = widget.journal.title;
+    final createdAt = widget.journal.createdAt;
+
+    // Format the date
+    final formattedDate = DateFormat('MMMM d, yyyy')
+        .format(DateTime.fromMillisecondsSinceEpoch(createdAt));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.isEmpty ? 'Title' : title,
+            style: TextStyle(
+              fontSize: 24.0,
+              fontWeight: FontWeight.w700,
+              color: theme.primaryText,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 4.0),
+          Text(
+            formattedDate,
+            style: TextStyle(
+              fontSize: 14.0,
+              color: theme.secondaryText,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildParagraphBlock(Map<String, dynamic> blockData) {
