@@ -117,7 +117,7 @@ class MetadataBlockWidget extends StatelessWidget
             Text(
               titleController.text,
               style: TextStyle(
-                fontSize: 32.0,
+                fontSize: 24.0,
                 fontWeight: FontWeight.w700,
                 color: theme.primaryText,
                 height: 1.5,
@@ -132,13 +132,13 @@ class MetadataBlockWidget extends StatelessWidget
                 border: InputBorder.none,
                 hintStyle: TextStyle(
                   color: theme.secondaryText,
-                  fontSize: 32.0,
+                  fontSize: 24.0,
                 ),
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
               style: TextStyle(
-                fontSize: 32.0,
+                fontSize: 24.0,
                 fontWeight: FontWeight.w700,
                 color: theme.primaryText,
                 height: 1.5,
