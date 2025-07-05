@@ -24,9 +24,9 @@ class EditorWidget extends StatefulWidget {
   const EditorWidget({
     super.key,
     required this.journal,
-    required this.onSave,
-    required this.onBack,
-    required this.onDelete,
+    this.onSave,
+    this.onBack,
+    this.onDelete,
     this.onPrayer,
     this.onScripture,
     this.onTag,
@@ -36,9 +36,9 @@ class EditorWidget extends StatefulWidget {
   });
 
   final Journal journal;
-  final Future Function(Journal updatedJournal, String contentJson) onSave;
-  final Future Function() onBack;
-  final Future Function() onDelete;
+  final Future Function(Journal updatedJournal, String contentJson)? onSave;
+  final Future Function()? onBack;
+  final Future Function()? onDelete;
   final Future Function()? onPrayer;
   final Future Function()? onScripture;
   final Future Function()? onTag;
@@ -369,7 +369,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                       onPressed: () async {
                         if (!_hasMeaningfulContent()) {
                           // If no meaningful content, just go back without saving
-                          await widget.onBack();
+                          if (widget.onBack != null) {
+                            await widget.onBack!();
+                          }
                           return;
                         }
                         final content = _controller.getDocumentContent();
@@ -382,11 +384,15 @@ class _EditorWidgetState extends State<EditorWidget> {
                         );
                         Log.info(
                             '🔍 Saving journal on back: ${updatedJournal.toJson()}');
-                        await widget.onSave(updatedJournal, content);
+                        if (widget.onSave != null) {
+                          await widget.onSave!(updatedJournal, content);
+                        }
                         setState(() {
                           _hasUnsavedChanges = false;
                         });
-                        await widget.onBack();
+                        if (widget.onBack != null) {
+                          await widget.onBack!();
+                        }
                       },
                       color: Theme.of(context).iconTheme.color,
                       iconSize: 24.0,
@@ -418,11 +424,13 @@ class _EditorWidgetState extends State<EditorWidget> {
                   children: [
                     IconButton(
                       icon: const Icon(JournalIcons.jtrash, size: 20),
-                      onPressed: () async {
-                        Log.info(
-                            '🔍 Deleting journal ID: ${widget.journal.id}');
-                        await widget.onDelete();
-                      },
+                      onPressed: widget.onDelete != null
+                          ? () async {
+                              Log.info(
+                                  '🔍 Deleting journal ID: ${widget.journal.id}');
+                              await widget.onDelete!();
+                            }
+                          : null,
                       color: Theme.of(context).iconTheme.color,
                       iconSize: 24.0,
                       constraints: const BoxConstraints(
@@ -639,7 +647,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                     onSave: () async {
                       if (!_hasMeaningfulContent()) {
                         // If no meaningful content, just go back without saving
-                        await widget.onBack();
+                        if (widget.onBack != null) {
+                          await widget.onBack!();
+                        }
                         return;
                       }
                       final content = _controller.getDocumentContent();
@@ -652,7 +662,9 @@ class _EditorWidgetState extends State<EditorWidget> {
                       );
                       Log.info(
                           '🔍 Saving journal from toolbar: ${updatedJournal.toJson()}');
-                      await widget.onSave(updatedJournal, content);
+                      if (widget.onSave != null) {
+                        await widget.onSave!(updatedJournal, content);
+                      }
                     },
                     focusNode: _focusNode,
                     onDocumentChanged: () => _onDocumentChanged(),
