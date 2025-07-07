@@ -207,7 +207,7 @@ class EditorScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.primaryBackground,
       body: EditorWidget(
-        journal: journal,
+        journal: journal.clone(),
         readOnly: readOnly,
         onSave: (updatedJournal, _) async {
           debugPrint("Saved: ${updatedJournal.toJson()}");

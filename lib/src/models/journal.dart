@@ -173,4 +173,13 @@ class Journal {
       content: document,
     );
   }
+
+  Journal clone() => Journal(
+        id: this.id,
+        title: this.title,
+        createdAt: this.createdAt,
+        lastModified: this.lastModified,
+        content: Document.fromJson(this.content.toJson()),
+        // Add other fields if present
+      );
 }

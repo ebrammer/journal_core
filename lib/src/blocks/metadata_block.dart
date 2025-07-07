@@ -101,104 +101,105 @@ class MetadataBlockWidget extends StatelessWidget
     final isReorderMode = toolbarState.isDragMode;
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
-    return Container(
-      // In reorder mode: Add horizontal padding (16.0) to align with reorderable blocks
-      // In edit mode: No horizontal padding (0.0) to align with content
-      // Vertical padding (8.0) remains consistent in both modes
-      padding: EdgeInsets.symmetric(
-        horizontal: isReorderMode ? 14.0 : 0.0,
-        vertical: isReorderMode ? 0 : 12.0,
-      ),
-
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (readOnly)
-            Text(
-              titleController.text,
-              style: TextStyle(
-                fontSize: 24.0,
-                fontWeight: FontWeight.w700,
-                color: theme.primaryText,
-                height: 1.5,
-              ),
-            )
-          else
-            TextField(
-              controller: titleController,
-              focusNode: titleFocusNode,
-              decoration: InputDecoration(
-                hintText: 'Title',
-                border: InputBorder.none,
-                hintStyle: TextStyle(
-                  color: theme.secondaryText,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        // color: Colors.red.withOpacity(0.2), // Remove debug background
+        padding: EdgeInsets.symmetric(
+          horizontal: isReorderMode ? 14.0 : 0.0,
+          vertical: isReorderMode ? 0 : 12.0,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (readOnly)
+              Text(
+                titleController.text,
+                textAlign: TextAlign.left,
+                style: TextStyle(
                   fontSize: 24.0,
+                  fontWeight: FontWeight.w700,
+                  color: theme.primaryText,
+                  height: 1.5,
                 ),
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
+              )
+            else
+              TextField(
+                controller: titleController,
+                focusNode: titleFocusNode,
+                decoration: InputDecoration(
+                  hintText: 'Title',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    color: theme.secondaryText,
+                    fontSize: 24.0,
+                  ),
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                style: TextStyle(
+                  fontSize: 24.0,
+                  fontWeight: FontWeight.w700,
+                  color: theme.primaryText,
+                  height: 1.5,
+                ),
+                maxLines: null,
+                minLines: 1,
+                textInputAction: TextInputAction.done,
+                onChanged: onTitleChanged,
+                onEditingComplete: onTitleEditingComplete,
+                onSubmitted: (value) {
+                  // Find the first content block (after metadata)
+                  final editorState =
+                      Provider.of<EditorState>(context, listen: false);
+                  int firstContentIndex = 0;
+                  for (int i = 0;
+                      i < editorState.document.root.children.length;
+                      i++) {
+                    if (editorState.document.root.children[i].type !=
+                            BlockTypeConstants.metadata &&
+                        editorState.document.root.children[i].type !=
+                            BlockTypeConstants.spacer) {
+                      firstContentIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Set selection to the first content block
+                  editorState.selection = Selection.collapsed(
+                    Position(path: [firstContentIndex], offset: 0),
+                  );
+
+                  // Request focus for the editor
+                  editorFocusNode?.requestFocus();
+
+                  // Call the original onSubmitted callback
+                  onTitleSubmitted?.call(value);
+                },
+                cursorColor: theme.primaryText,
+                cursorWidth: 2.0,
+                cursorRadius: const Radius.circular(1.0),
+                onTap: () {
+                  // Clear any selection in the editor when title gets focus
+                  final editorState =
+                      Provider.of<EditorState>(context, listen: false);
+                  editorState.selection = null;
+                },
               ),
+            const SizedBox(height: 4.0),
+            Text(
+              '$formattedDate',
               style: TextStyle(
-                fontSize: 24.0,
-                fontWeight: FontWeight.w700,
-                color: theme.primaryText,
+                fontSize: 14.0,
+                color: theme.secondaryText,
                 height: 1.5,
               ),
-              maxLines: null,
-              minLines: 1,
-              textInputAction: TextInputAction.done,
-              onChanged: onTitleChanged,
-              onEditingComplete: onTitleEditingComplete,
-              onSubmitted: (value) {
-                // Find the first content block (after metadata)
-                final editorState =
-                    Provider.of<EditorState>(context, listen: false);
-                int firstContentIndex = 0;
-                for (int i = 0;
-                    i < editorState.document.root.children.length;
-                    i++) {
-                  if (editorState.document.root.children[i].type !=
-                          BlockTypeConstants.metadata &&
-                      editorState.document.root.children[i].type !=
-                          BlockTypeConstants.spacer) {
-                    firstContentIndex = i;
-                    break;
-                  }
-                }
-
-                // Set selection to the first content block
-                editorState.selection = Selection.collapsed(
-                  Position(path: [firstContentIndex], offset: 0),
-                );
-
-                // Request focus for the editor
-                editorFocusNode?.requestFocus();
-
-                // Call the original onSubmitted callback
-                onTitleSubmitted?.call(value);
-              },
-              cursorColor: theme.primaryText,
-              cursorWidth: 2.0,
-              cursorRadius: const Radius.circular(1.0),
-              onTap: () {
-                // Clear any selection in the editor when title gets focus
-                final editorState =
-                    Provider.of<EditorState>(context, listen: false);
-                editorState.selection = null;
-              },
             ),
-          const SizedBox(height: 4.0),
-          Text(
-            '$formattedDate',
-            style: TextStyle(
-              fontSize: 14.0,
-              color: theme.secondaryText,
-              height: 1.5,
-            ),
-          ),
-          isReorderMode
-              ? const SizedBox(height: 12.0)
-              : const SizedBox.shrink(),
-        ],
+            isReorderMode
+                ? const SizedBox(height: 12.0)
+                : const SizedBox.shrink(),
+          ],
+        ),
       ),
     );
   }

@@ -323,14 +323,7 @@ class _EditorWidgetState extends State<EditorWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // If in read-only mode, show the ReadOnlyViewer instead
-    if (widget.readOnly) {
-      return ReadOnlyViewer(
-        journal: widget.journal,
-        onContentTap: widget.onContentTap,
-      );
-    }
-
+    // Always use the main editor widget, even in readOnly mode
     if (_editorState == null) {
       print(
           '⚠️ [editor_widget] Editor state is null, showing loading indicator');
@@ -339,35 +332,330 @@ class _EditorWidgetState extends State<EditorWidget> {
 
     print('🏗️ [editor_widget] Building editor widget');
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
+
+    // If readOnly, unfocus all focus nodes and clear selection
+    if (widget.readOnly) {
+      _focusNode.unfocus();
+      _titleFocusNode.unfocus();
+      _editorState.selection = null;
+    }
+
+    Widget editorBody = Consumer<ToolbarState>(
+      builder: (context, toolbarState, _) {
+        if (toolbarState.isDragMode) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            unfocusAndHideKeyboard(context);
+            if (_editorState.selection == null && _selectedBlockPath != null) {
+              _editorState.selection = Selection.collapsed(
+                Position(path: _selectedBlockPath!, offset: 0),
+              );
+            }
+          });
+          Log.info(
+              '🔍 Switching to ReorderableEditor, nodes: \\${_editorState.document.root.children.length}, '
+              'selection: \\${_editorState.selection}, selectedBlockPath: \\$_selectedBlockPath');
+          return _editorState.document.root.children.length <= 1
+              ? const Center(child: Text('No blocks to reorder'))
+              : ReorderableEditor(
+                  key: _reorderableKey,
+                  editorState: _editorState,
+                  selectedBlockPath: _selectedBlockPath,
+                  onBlockSelected: _onBlockSelected,
+                  onDocumentChanged: (List<int>? newPath) =>
+                      _onDocumentChanged(newPath),
+                  journal: widget.journal,
+                  onTitleChanged: (value) {
+                    setState(() {
+                      _currentTitle = value;
+                    });
+                  },
+                  focusNode: _focusNode,
+                  readOnly: true,
+                );
+        } else {
+          Widget appFlowy = NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollUpdateNotification ||
+                  notification is UserScrollNotification) {
+                final offset = notification.metrics.pixels;
+                final shouldShow = offset > 80.0;
+                if (_showCollapsedTitle != shouldShow) {
+                  setState(() {
+                    _showCollapsedTitle = shouldShow;
+                  });
+                }
+              }
+              return false;
+            },
+            child: AppFlowyEditor(
+              key: ValueKey(_editorState.document.toJson().toString()),
+              editorState: _editorState,
+              focusNode: _focusNode,
+              blockComponentBuilders: {
+                ...standardBlockComponentBuilderMap,
+                'spacer_block': spacerBlockBuilder,
+                quote.QuoteBlockKeys.type: quote.quoteBlockBuilder,
+                'metadata_block': MetadataBlockBuilder(
+                  titleController: titleController,
+                  createdAt: widget.journal.createdAt,
+                  onTitleChanged: (value) {
+                    setState(() {
+                      _currentTitle = value;
+                    });
+                  },
+                  titleFocusNode: _titleFocusNode,
+                  onTitleEditingComplete: () => _titleFocusNode.unfocus(),
+                  onTitleSubmitted: (_) => _titleFocusNode.unfocus(),
+                  readOnly: widget.readOnly,
+                  editorFocusNode: _focusNode,
+                ),
+                'date': MetadataBlockBuilder(
+                  titleController: TextEditingController(text: 'Date'),
+                  createdAt: widget.journal.createdAt,
+                  onTitleChanged: (_) {},
+                  titleFocusNode: FocusNode(),
+                  onTitleEditingComplete: () {},
+                  onTitleSubmitted: (_) {},
+                  readOnly: true,
+                  editorFocusNode: _focusNode,
+                ),
+                'title': MetadataBlockBuilder(
+                  titleController:
+                      TextEditingController(text: widget.journal.title),
+                  createdAt: widget.journal.createdAt,
+                  onTitleChanged: (value) {
+                    setState(() {
+                      _currentTitle = value;
+                    });
+                  },
+                  titleFocusNode: _titleFocusNode,
+                  onTitleEditingComplete: () => _titleFocusNode.unfocus(),
+                  onTitleSubmitted: (_) => _titleFocusNode.unfocus(),
+                  readOnly: widget.readOnly,
+                ),
+                divider.DividerBlockKeys.type:
+                    divider.DividerBlockComponentBuilder(),
+              },
+              editorStyle: EditorStyle.mobile(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                cursorColor: theme.primaryText,
+                textStyleConfiguration: TextStyleConfiguration(
+                  text: TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: theme.primaryText,
+                  ),
+                  bold: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: theme.primaryText,
+                  ),
+                  italic: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: theme.primaryText,
+                  ),
+                ),
+                textSpanDecorator: globals.defaultTextSpanDecoratorForAttribute,
+              ),
+            ),
+          );
+          // Wrap in GestureDetector if readOnly and onContentTap is provided
+          if (widget.readOnly && widget.onContentTap != null) {
+            return GestureDetector(
+              onTap: () async {
+                await widget.onContentTap!();
+              },
+              child: appFlowy,
+            );
+          } else {
+            return appFlowy;
+          }
+        }
+      },
+    );
+
     return ChangeNotifierProvider<ToolbarState>.value(
       value: _toolbarState,
       child: Scaffold(
         backgroundColor: theme.primaryBackground,
-        appBar: AppBar(
-          backgroundColor: theme.primaryBackground,
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: theme.primaryBackground,
-            statusBarIconBrightness:
-                Theme.of(context).brightness == Brightness.dark
-                    ? Brightness.light
-                    : Brightness.dark,
-          ),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          titleSpacing: 0,
-          leadingWidth: 0,
-          automaticallyImplyLeading: false,
-          title: Padding(
-            padding: const EdgeInsets.only(left: 4, right: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(JournalIcons.jarrowLeft, size: 24),
-                      onPressed: () async {
+        appBar: widget.readOnly
+            ? null
+            : AppBar(
+                backgroundColor: theme.primaryBackground,
+                systemOverlayStyle: SystemUiOverlayStyle(
+                  statusBarColor: theme.primaryBackground,
+                  statusBarIconBrightness:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? Brightness.light
+                          : Brightness.dark,
+                ),
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                surfaceTintColor: Colors.transparent,
+                titleSpacing: 0,
+                leadingWidth: 0,
+                automaticallyImplyLeading: false,
+                title: Padding(
+                  padding: const EdgeInsets.only(left: 4, right: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(JournalIcons.jarrowLeft, size: 24),
+                            onPressed: () async {
+                              if (!_hasMeaningfulContent()) {
+                                // If no meaningful content, just go back without saving
+                                if (widget.onBack != null) {
+                                  await widget.onBack!();
+                                }
+                                return;
+                              }
+                              final content = _controller.getDocumentContent();
+                              final updatedJournal = Journal(
+                                id: widget.journal.id,
+                                title: _currentTitle,
+                                createdAt: widget.journal.createdAt,
+                                lastModified:
+                                    DateTime.now().millisecondsSinceEpoch,
+                                content: _editorState.document,
+                              );
+                              Log.info(
+                                  '🔍 Saving journal on back: \\${updatedJournal.toJson()}');
+                              if (widget.onSave != null) {
+                                await widget.onSave!(updatedJournal, content);
+                              }
+                              setState(() {
+                                _hasUnsavedChanges = false;
+                              });
+                              if (widget.onBack != null) {
+                                await widget.onBack!();
+                              }
+                            },
+                            color: Theme.of(context).iconTheme.color,
+                            iconSize: 24.0,
+                            constraints: const BoxConstraints(
+                              minWidth: 48,
+                              minHeight: 48,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          if (_showCollapsedTitle)
+                            Container(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.of(context).size.width * 0.6,
+                              ),
+                              child: Text(
+                                _currentTitle.isEmpty ? 'Title' : _currentTitle,
+                                style: TextStyle(
+                                  fontSize: 16.0,
+                                  fontWeight: FontWeight.w400,
+                                  color: theme.primaryText,
+                                  letterSpacing: 0.5,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(JournalIcons.jtrash, size: 20),
+                            onPressed: widget.onDelete != null
+                                ? () async {
+                                    Log.info(
+                                        '🔍 Deleting journal ID: \\${widget.journal.id}');
+                                    await widget.onDelete!();
+                                  }
+                                : null,
+                            color: Theme.of(context).iconTheme.color,
+                            iconSize: 24.0,
+                            constraints: const BoxConstraints(
+                              minWidth: 48,
+                              minHeight: 48,
+                            ),
+                            padding: const EdgeInsets.all(12.0),
+                          ),
+                          Container(
+                            margin: const EdgeInsets.only(right: 8.0),
+                            child: ElevatedButton(
+                              onPressed: _hasUnsavedChanges
+                                  ? () async {
+                                      final content =
+                                          _controller.getDocumentContent();
+                                      final updatedJournal = Journal(
+                                        id: widget.journal.id,
+                                        title: _currentTitle,
+                                        createdAt: widget.journal.createdAt,
+                                        lastModified: DateTime.now()
+                                            .millisecondsSinceEpoch,
+                                        content: _editorState.document,
+                                      );
+                                      Log.info(
+                                          '🔍 Saving journal via save button: \\${updatedJournal.toJson()}');
+                                      // Always use onSaveOnly for the save button to avoid navigation
+                                      if (widget.onSaveOnly != null) {
+                                        await widget.onSaveOnly!(
+                                            updatedJournal, content);
+                                      } else {
+                                        // If no onSaveOnly provided, just save without any callback
+                                        // This prevents navigation when save button is pressed
+                                        Log.info(
+                                            '🔍 Save button pressed but no onSaveOnly callback provided');
+                                      }
+                                      setState(() {
+                                        _hasUnsavedChanges = false;
+                                      });
+                                    }
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _hasUnsavedChanges
+                                    ? theme.primaryText
+                                    : theme.secondaryText
+                                        .withValues(alpha: 0.3),
+                                foregroundColor: _hasUnsavedChanges
+                                    ? theme.primaryBackground
+                                    : theme.secondaryText,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 4.0,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20.0),
+                                ),
+                                minimumSize: const Size(60, 32),
+                              ),
+                              child: const Text(
+                                'Save',
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        body: Container(
+          color: theme.primaryBackground,
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(child: editorBody),
+                  if (!widget.readOnly)
+                    JournalToolbar(
+                      editorState: _editorState,
+                      controller: _controller,
+                      onSave: () async {
                         if (!_hasMeaningfulContent()) {
                           // If no meaningful content, just go back without saving
                           if (widget.onBack != null) {
@@ -384,311 +672,31 @@ class _EditorWidgetState extends State<EditorWidget> {
                           content: _editorState.document,
                         );
                         Log.info(
-                            '🔍 Saving journal on back: ${updatedJournal.toJson()}');
+                            '🔍 Saving journal from toolbar: \\${updatedJournal.toJson()}');
                         if (widget.onSave != null) {
                           await widget.onSave!(updatedJournal, content);
                         }
-                        setState(() {
-                          _hasUnsavedChanges = false;
-                        });
-                        if (widget.onBack != null) {
-                          await widget.onBack!();
+                      },
+                      focusNode: _focusNode,
+                      onDocumentChanged: () => _onDocumentChanged(),
+                      onMoveUp: () {
+                        if (_selectedBlockPath != null &&
+                            _reorderableKey.currentState != null) {
+                          _reorderableKey.currentState!
+                              .moveBlock(_selectedBlockPath![0], -1);
                         }
                       },
-                      color: Theme.of(context).iconTheme.color,
-                      iconSize: 24.0,
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                    if (_showCollapsedTitle)
-                      Container(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.6,
-                        ),
-                        child: Text(
-                          _currentTitle.isEmpty ? 'Title' : _currentTitle,
-                          style: TextStyle(
-                            fontSize: 16.0,
-                            fontWeight: FontWeight.w400,
-                            color: theme.primaryText,
-                            letterSpacing: 0.5,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(JournalIcons.jtrash, size: 20),
-                      onPressed: widget.onDelete != null
-                          ? () async {
-                              Log.info(
-                                  '🔍 Deleting journal ID: ${widget.journal.id}');
-                              await widget.onDelete!();
-                            }
-                          : null,
-                      color: Theme.of(context).iconTheme.color,
-                      iconSize: 24.0,
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      padding: const EdgeInsets.all(12.0),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.only(right: 8.0),
-                      child: ElevatedButton(
-                        onPressed: _hasUnsavedChanges
-                            ? () async {
-                                final content =
-                                    _controller.getDocumentContent();
-                                final updatedJournal = Journal(
-                                  id: widget.journal.id,
-                                  title: _currentTitle,
-                                  createdAt: widget.journal.createdAt,
-                                  lastModified:
-                                      DateTime.now().millisecondsSinceEpoch,
-                                  content: _editorState.document,
-                                );
-                                Log.info(
-                                    '🔍 Saving journal via save button: ${updatedJournal.toJson()}');
-                                // Always use onSaveOnly for the save button to avoid navigation
-                                if (widget.onSaveOnly != null) {
-                                  await widget.onSaveOnly!(
-                                      updatedJournal, content);
-                                } else {
-                                  // If no onSaveOnly provided, just save without any callback
-                                  // This prevents navigation when save button is pressed
-                                  Log.info(
-                                      '🔍 Save button pressed but no onSaveOnly callback provided');
-                                }
-                                setState(() {
-                                  _hasUnsavedChanges = false;
-                                });
-                              }
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _hasUnsavedChanges
-                              ? theme.primaryText
-                              : theme.secondaryText.withValues(alpha: 0.3),
-                          foregroundColor: _hasUnsavedChanges
-                              ? theme.primaryBackground
-                              : theme.secondaryText,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 4.0,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20.0),
-                          ),
-                          minimumSize: const Size(60, 32),
-                        ),
-                        child: const Text(
-                          'Save',
-                          style: TextStyle(
-                            fontSize: 14.0,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        body: Container(
-          color: theme.primaryBackground,
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  Expanded(
-                    child: Consumer<ToolbarState>(
-                      builder: (context, toolbarState, _) {
-                        if (toolbarState.isDragMode) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            unfocusAndHideKeyboard(context);
-                            if (_editorState.selection == null &&
-                                _selectedBlockPath != null) {
-                              _editorState.selection = Selection.collapsed(
-                                Position(path: _selectedBlockPath!, offset: 0),
-                              );
-                            }
-                          });
-                          Log.info(
-                              '🔍 Switching to ReorderableEditor, nodes: ${_editorState.document.root.children.length}, '
-                              'selection: ${_editorState.selection}, selectedBlockPath: $_selectedBlockPath');
-                          return _editorState.document.root.children.isEmpty
-                              ? const Center(
-                                  child: Text('No blocks to reorder'))
-                              : ReorderableEditor(
-                                  key: _reorderableKey,
-                                  editorState: _editorState,
-                                  selectedBlockPath: _selectedBlockPath,
-                                  onBlockSelected: _onBlockSelected,
-                                  onDocumentChanged: (List<int>? newPath) =>
-                                      _onDocumentChanged(newPath),
-                                  journal: widget.journal,
-                                  onTitleChanged: (value) {
-                                    setState(() {
-                                      _currentTitle = value;
-                                    });
-                                  },
-                                  focusNode: _focusNode,
-                                  readOnly: true,
-                                );
-                        } else {
-                          return NotificationListener<ScrollNotification>(
-                            onNotification: (notification) {
-                              if (notification is ScrollUpdateNotification ||
-                                  notification is UserScrollNotification) {
-                                final offset = notification.metrics.pixels;
-                                final shouldShow = offset > 80.0;
-                                if (_showCollapsedTitle != shouldShow) {
-                                  setState(() {
-                                    _showCollapsedTitle = shouldShow;
-                                  });
-                                }
-                              }
-                              return false;
-                            },
-                            child: AppFlowyEditor(
-                              key: ValueKey(
-                                  _editorState.document.toJson().toString()),
-                              editorState: _editorState,
-                              focusNode: _focusNode,
-                              blockComponentBuilders: {
-                                ...standardBlockComponentBuilderMap,
-                                'spacer_block': spacerBlockBuilder,
-                                quote.QuoteBlockKeys.type:
-                                    quote.quoteBlockBuilder,
-                                'metadata_block': MetadataBlockBuilder(
-                                  titleController: titleController,
-                                  createdAt: widget.journal.createdAt,
-                                  onTitleChanged: (value) {
-                                    setState(() {
-                                      _currentTitle = value;
-                                    });
-                                  },
-                                  titleFocusNode: _titleFocusNode,
-                                  onTitleEditingComplete: () =>
-                                      _titleFocusNode.unfocus(),
-                                  onTitleSubmitted: (_) =>
-                                      _titleFocusNode.unfocus(),
-                                  readOnly: false,
-                                  editorFocusNode: _focusNode,
-                                ),
-                                'date': MetadataBlockBuilder(
-                                  titleController:
-                                      TextEditingController(text: 'Date'),
-                                  createdAt: widget.journal.createdAt,
-                                  onTitleChanged: (_) {},
-                                  titleFocusNode: FocusNode(),
-                                  onTitleEditingComplete: () {},
-                                  onTitleSubmitted: (_) {},
-                                  readOnly: true,
-                                  editorFocusNode: _focusNode,
-                                ),
-                                'title': MetadataBlockBuilder(
-                                  titleController: TextEditingController(
-                                      text: widget.journal.title),
-                                  createdAt: widget.journal.createdAt,
-                                  onTitleChanged: (value) {
-                                    setState(() {
-                                      _currentTitle = value;
-                                    });
-                                  },
-                                  titleFocusNode: _titleFocusNode,
-                                  onTitleEditingComplete: () =>
-                                      _titleFocusNode.unfocus(),
-                                  onTitleSubmitted: (_) =>
-                                      _titleFocusNode.unfocus(),
-                                  readOnly: false,
-                                ),
-                                divider.DividerBlockKeys.type:
-                                    divider.DividerBlockComponentBuilder(),
-                              },
-                              editorStyle: EditorStyle.mobile(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 8),
-                                cursorColor: theme.primaryText,
-                                textStyleConfiguration: TextStyleConfiguration(
-                                  text: TextStyle(
-                                    fontSize: 16,
-                                    height: 1.5,
-                                    color: theme.primaryText,
-                                  ),
-                                  bold: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.primaryText,
-                                  ),
-                                  italic: TextStyle(
-                                    fontStyle: FontStyle.italic,
-                                    color: theme.primaryText,
-                                  ),
-                                ),
-                                textSpanDecorator: globals
-                                    .defaultTextSpanDecoratorForAttribute,
-                              ),
-                            ),
-                          );
+                      onMoveDown: () {
+                        if (_selectedBlockPath != null &&
+                            _reorderableKey.currentState != null) {
+                          _reorderableKey.currentState!
+                              .moveBlock(_selectedBlockPath![0], 1);
                         }
                       },
+                      onPrayer: widget.onPrayer,
+                      onScripture: widget.onScripture,
+                      onTag: widget.onTag,
                     ),
-                  ),
-                  JournalToolbar(
-                    editorState: _editorState,
-                    controller: _controller,
-                    onSave: () async {
-                      if (!_hasMeaningfulContent()) {
-                        // If no meaningful content, just go back without saving
-                        if (widget.onBack != null) {
-                          await widget.onBack!();
-                        }
-                        return;
-                      }
-                      final content = _controller.getDocumentContent();
-                      final updatedJournal = Journal(
-                        id: widget.journal.id,
-                        title: _currentTitle,
-                        createdAt: widget.journal.createdAt,
-                        lastModified: DateTime.now().millisecondsSinceEpoch,
-                        content: _editorState.document,
-                      );
-                      Log.info(
-                          '🔍 Saving journal from toolbar: ${updatedJournal.toJson()}');
-                      if (widget.onSave != null) {
-                        await widget.onSave!(updatedJournal, content);
-                      }
-                    },
-                    focusNode: _focusNode,
-                    onDocumentChanged: () => _onDocumentChanged(),
-                    onMoveUp: () {
-                      if (_selectedBlockPath != null &&
-                          _reorderableKey.currentState != null) {
-                        _reorderableKey.currentState!
-                            .moveBlock(_selectedBlockPath![0], -1);
-                      }
-                    },
-                    onMoveDown: () {
-                      if (_selectedBlockPath != null &&
-                          _reorderableKey.currentState != null) {
-                        _reorderableKey.currentState!
-                            .moveBlock(_selectedBlockPath![0], 1);
-                      }
-                    },
-                    onPrayer: widget.onPrayer,
-                    onScripture: widget.onScripture,
-                    onTag: widget.onTag,
-                  ),
                 ],
               ),
             ],
