@@ -236,6 +236,24 @@ class EditorScreen extends StatelessWidget {
         onTag: () async {
           debugPrint("Adding tag");
         },
+        onContentTap: () async {
+          debugPrint("🔍 onContentTap callback triggered!");
+          // Show a snackbar when content is tapped in read-only mode
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Content tapped! Journal: ${journal.title.isEmpty ? 'Untitled' : journal.title}'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'OK',
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }

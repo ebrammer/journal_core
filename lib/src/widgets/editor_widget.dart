@@ -329,7 +329,8 @@ class _EditorWidgetState extends State<EditorWidget> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    print('🏗️ [editor_widget] Building editor widget');
+    print(
+        '🏗️ [editor_widget] Building editor widget - readOnly: ${widget.readOnly}, onContentTap: ${widget.onContentTap != null}');
     final theme = JournalTheme.fromBrightness(Theme.of(context).brightness);
 
     // If readOnly, unfocus all focus nodes and clear selection
@@ -461,10 +462,15 @@ class _EditorWidgetState extends State<EditorWidget> {
           // Wrap in GestureDetector if readOnly and onContentTap is provided
           if (widget.readOnly && widget.onContentTap != null) {
             return GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () async {
+                print(
+                    '🔍 [editor_widget] onContentTap triggered in readOnly mode');
                 await widget.onContentTap!();
               },
-              child: appFlowy,
+              child: AbsorbPointer(
+                child: appFlowy,
+              ),
             );
           } else {
             return appFlowy;
