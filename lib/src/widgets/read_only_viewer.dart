@@ -89,6 +89,7 @@ class _ReadOnlyViewerState extends State<ReadOnlyViewer> {
       children: [
         // Content blocks using extracted data
         ..._contentBlocks.map((blockData) => _buildBlock(blockData)),
+        const SizedBox(height: 100), // Extra space at the end
       ],
     );
   }
