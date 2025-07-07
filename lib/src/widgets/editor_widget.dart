@@ -19,6 +19,7 @@ import '../toolbar/toolbar_state.dart';
 import '../toolbar/toolbar_widget.dart';
 import '../utils/logging.dart';
 import 'read_only_viewer.dart';
+import 'package:journal_core/src/blocks/quote_block.dart' as quote;
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
@@ -567,6 +568,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                               blockComponentBuilders: {
                                 ...standardBlockComponentBuilderMap,
                                 'spacer_block': spacerBlockBuilder,
+                                quote.QuoteBlockKeys.type:
+                                    quote.quoteBlockBuilder,
                                 'metadata_block': MetadataBlockBuilder(
                                   titleController: titleController,
                                   createdAt: widget.journal.createdAt,

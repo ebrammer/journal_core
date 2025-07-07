@@ -6,6 +6,7 @@ import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui' show lerpDouble;
 import 'package:journal_core/src/blocks/divider_block.dart' as divider;
+import 'package:journal_core/src/blocks/quote_block.dart' as quote;
 import '../theme/journal_theme.dart';
 import '../models/journal.dart';
 
@@ -322,6 +323,11 @@ class ReorderableEditorState extends State<ReorderableEditor> {
         node: entry.node,
         configuration: const BlockComponentConfiguration(),
       );
+    } else if (entry.node.type == quote.QuoteBlockKeys.type) {
+      child = quote.QuoteBlockComponentWidget(
+        node: entry.node,
+        configuration: const BlockComponentConfiguration(),
+      );
     } else if (widget.customBlockRenderers?.containsKey(entry.node.type) ??
         false) {
       child = widget.customBlockRenderers![entry.node.type]!(
@@ -521,18 +527,8 @@ class ReorderableEditorState extends State<ReorderableEditor> {
       },
       proxyDecorator: _proxyDecorator,
       itemBuilder: (context, index) {
-        if (index >= validFlattenedBlocks.length) {
-          Log.error(
-              '[ReorderableEditor.build] Index $index out of bounds for validFlattenedBlocks length ${validFlattenedBlocks.length}');
-          return Container(
-            key: ValueKey('block_$index'),
-            child: Text(
-              '[Error: Index out of bounds]',
-              style: TextStyle(fontSize: 14, color: theme.error),
-            ),
-          );
-        }
-        return _buildBlock(validFlattenedBlocks[index]);
+        final entry = validFlattenedBlocks[index];
+        return _buildBlock(entry);
       },
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
