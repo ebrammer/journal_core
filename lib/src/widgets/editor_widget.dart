@@ -18,7 +18,6 @@ import '../editor/journal_editor_controller.dart';
 import '../toolbar/toolbar_state.dart';
 import '../toolbar/toolbar_widget.dart';
 import '../utils/logging.dart';
-import 'read_only_viewer.dart';
 import 'package:journal_core/src/blocks/quote_block.dart' as quote;
 
 class EditorWidget extends StatefulWidget {
