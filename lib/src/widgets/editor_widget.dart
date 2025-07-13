@@ -24,6 +24,7 @@ class EditorWidget extends StatefulWidget {
   const EditorWidget({
     super.key,
     required this.journal,
+    this.journalID,
     this.onSave,
     this.onBack,
     this.onDelete,
@@ -37,8 +38,10 @@ class EditorWidget extends StatefulWidget {
   });
 
   final Journal journal;
-  final Future Function(Journal updatedJournal, String contentJson)? onSave;
-  final Future Function()? onBack;
+  final String? journalID;
+  final Future Function(
+      Journal updatedJournal, String contentJson, String? journalID)? onSave;
+  final Future Function(String? journalID)? onBack;
   final Future Function()? onDelete;
   final Future Function()? onPrayer;
   final Future Function()? onScripture;
@@ -46,7 +49,8 @@ class EditorWidget extends StatefulWidget {
   final Future Function(String selectedText)? onShare;
   final bool readOnly;
   final Future<void> Function()? onContentTap;
-  final Future<void> Function(Journal updatedJournal, String contentJson)?
+  final Future<void> Function(
+          Journal updatedJournal, String contentJson, String? journalID)?
       onSaveOnly;
 
   @override
@@ -515,7 +519,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                               if (!_hasMeaningfulContent()) {
                                 // If no meaningful content, just go back without saving
                                 if (widget.onBack != null) {
-                                  await widget.onBack!();
+                                  await widget.onBack!(widget.journalID);
                                 }
                                 return;
                               }
@@ -531,13 +535,14 @@ class _EditorWidgetState extends State<EditorWidget> {
                               Log.info(
                                   '🔍 Saving journal on back: \\${updatedJournal.toJson()}');
                               if (widget.onSave != null) {
-                                await widget.onSave!(updatedJournal, content);
+                                await widget.onSave!(
+                                    updatedJournal, content, widget.journalID);
                               }
                               setState(() {
                                 _hasUnsavedChanges = false;
                               });
                               if (widget.onBack != null) {
-                                await widget.onBack!();
+                                await widget.onBack!(widget.journalID);
                               }
                             },
                             color: Theme.of(context).iconTheme.color,
@@ -605,8 +610,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                                           '🔍 Saving journal via save button: \\${updatedJournal.toJson()}');
                                       // Always use onSaveOnly for the save button to avoid navigation
                                       if (widget.onSaveOnly != null) {
-                                        await widget.onSaveOnly!(
-                                            updatedJournal, content);
+                                        await widget.onSaveOnly!(updatedJournal,
+                                            content, widget.journalID);
                                       } else {
                                         // If no onSaveOnly provided, just save without any callback
                                         // This prevents navigation when save button is pressed
@@ -666,7 +671,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                         if (!_hasMeaningfulContent()) {
                           // If no meaningful content, just go back without saving
                           if (widget.onBack != null) {
-                            await widget.onBack!();
+                            await widget.onBack!(widget.journalID);
                           }
                           return;
                         }
@@ -681,7 +686,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                         Log.info(
                             '🔍 Saving journal from toolbar: \\${updatedJournal.toJson()}');
                         if (widget.onSave != null) {
-                          await widget.onSave!(updatedJournal, content);
+                          await widget.onSave!(
+                              updatedJournal, content, widget.journalID);
                         }
                       },
                       focusNode: _focusNode,

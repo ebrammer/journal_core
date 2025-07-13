@@ -209,14 +209,14 @@ class EditorScreen extends StatelessWidget {
       body: EditorWidget(
         journal: journal.clone(),
         readOnly: readOnly,
-        onSave: (updatedJournal, _) async {
+        onSave: (updatedJournal, _, journalID) async {
           debugPrint("Saved: ${updatedJournal.toJson()}");
           onJournalSaved(updatedJournal);
           if (Navigator.canPop(context)) {
             Navigator.of(context).pop();
           }
         },
-        onBack: () async {
+        onBack: (journalID) async {
           if (Navigator.canPop(context)) {
             Navigator.of(context).pop();
           }
