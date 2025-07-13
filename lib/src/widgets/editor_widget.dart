@@ -30,6 +30,7 @@ class EditorWidget extends StatefulWidget {
     this.onPrayer,
     this.onScripture,
     this.onTag,
+    this.onShare,
     this.readOnly = false,
     this.onContentTap,
     this.onSaveOnly,
@@ -42,6 +43,7 @@ class EditorWidget extends StatefulWidget {
   final Future Function()? onPrayer;
   final Future Function()? onScripture;
   final Future Function()? onTag;
+  final Future Function(String selectedText)? onShare;
   final bool readOnly;
   final Future<void> Function()? onContentTap;
   final Future<void> Function(Journal updatedJournal, String contentJson)?
@@ -701,6 +703,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                       onPrayer: widget.onPrayer,
                       onScripture: widget.onScripture,
                       onTag: widget.onTag,
+                      onShare: widget.onShare,
                     ),
                 ],
               ),

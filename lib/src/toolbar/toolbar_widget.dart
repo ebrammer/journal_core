@@ -27,6 +27,7 @@ class JournalToolbar extends StatefulWidget {
     this.onPrayer,
     this.onScripture,
     this.onTag,
+    this.onShare,
   });
 
   final EditorState editorState;
@@ -39,6 +40,7 @@ class JournalToolbar extends StatefulWidget {
   final Future Function()? onPrayer;
   final Future Function()? onScripture;
   final Future Function()? onTag;
+  final Future Function(String selectedText)? onShare;
 
   @override
   State<JournalToolbar> createState() => _JournalToolbarState();
@@ -174,6 +176,12 @@ class _JournalToolbarState extends State<JournalToolbar> {
                           icon: JournalIcons.jscissors,
                           label: 'Cut',
                           onTap: () => _actions.handleCutToClipboard(),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInsertPill(
+                          icon: JournalIcons.jshare,
+                          label: 'Share',
+                          onTap: () => _handleShare(),
                         ),
                       ] else ...[
                         if (toolbarState.hasClipboardContent)
@@ -487,6 +495,67 @@ class _JournalToolbarState extends State<JournalToolbar> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleShare() async {
+    Log.info('🔍 Share button tapped');
+    if (widget.onShare != null) {
+      final selection = widget.editorState.selection;
+      if (selection == null || selection.isCollapsed) {
+        Log.info('🔍 No valid selection for sharing');
+        return;
+      }
+
+      Log.info(
+          '🔍 Selection: ${selection.start.path} -> ${selection.end.path}, ${selection.start.offset} -> ${selection.end.offset}');
+
+      final node = widget.editorState.getNodeAtPath(selection.start.path);
+      if (node == null) {
+        Log.info('🔍 Could not find node at path: ${selection.start.path}');
+        return;
+      }
+
+      final attributes = Map<String, dynamic>.from(node.attributes);
+      final delta = attributes['delta'] as List? ?? [];
+      if (delta.isEmpty) {
+        Log.info('🔍 No delta found in node attributes');
+        return;
+      }
+
+      final startOffset = selection.start.offset;
+      final endOffset = selection.end.offset;
+      var currentOffset = 0;
+      final plainText = StringBuffer();
+
+      Log.info('🔍 Processing delta with ${delta.length} operations');
+
+      for (final op in delta) {
+        final text = op['insert'] as String;
+        final length = text.length;
+        if (currentOffset + length > startOffset && currentOffset < endOffset) {
+          final start =
+              startOffset > currentOffset ? startOffset - currentOffset : 0;
+          final end = endOffset < currentOffset + length
+              ? endOffset - currentOffset
+              : length;
+          final selectedText = text.substring(start, end);
+          plainText.write(selectedText);
+          Log.info('🔍 Extracted text: "$selectedText" from "$text"');
+        }
+        currentOffset += length;
+      }
+
+      final finalText = plainText.toString();
+      if (finalText.isNotEmpty) {
+        Log.info('🔍 Calling onShare callback with text: "$finalText"');
+        await widget.onShare!(finalText);
+        Log.info('🔍 onShare callback completed');
+      } else {
+        Log.info('🔍 No text extracted for sharing');
+      }
+    } else {
+      Log.info('🔍 onShare callback is null');
+    }
   }
 
   Future<void> _checkClipboardContent(ToolbarState toolbarState) async {
