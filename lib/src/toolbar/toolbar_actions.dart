@@ -371,56 +371,117 @@ class ToolbarActions {
   void handleInsertDivider() {
     final selection = editorState.selection;
     if (selection == null) return;
-    final index = selection.start.path.first;
 
-    final savedSelection = selection;
+    final index = selection.start.path.first;
+    final document = editorState.document;
+
+    // Save the original selection to restore it later
+    final originalSelection = selection;
     final hadFocus = focusNode?.hasFocus ?? false;
 
-    final transaction = editorState.transaction;
+    // Ensure we don't go out of bounds
+    if (index >= document.root.children.length) {
+      // If we're at the end, insert at the end
+      final insertIndex = document.root.children.length;
 
-    // Insert the divider
-    transaction.insertNode(
-      Path.from([index + 1]),
-      Node(
-        type: divider.DividerBlockKeys.type,
-        attributes: {
-          'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        },
-      ),
-    );
+      final transaction = editorState.transaction;
 
-    // Always add a paragraph after the divider
-    transaction.insertNode(
-      Path.from([index + 2]),
-      Node(
-        type: BlockTypeConstants.paragraph,
-        attributes: {
-          'delta': [
-            {'insert': ''}
-          ]
-        },
-      ),
-    );
+      // Insert the divider at the end
+      transaction.insertNode(
+        Path.from([insertIndex]),
+        Node(
+          type: divider.DividerBlockKeys.type,
+          attributes: {
+            'id': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+        ),
+      );
 
-    editorState.apply(transaction);
-    toolbarState.showInsertMenu = false;
+      // Add a paragraph after the divider
+      transaction.insertNode(
+        Path.from([insertIndex + 1]),
+        Node(
+          type: BlockTypeConstants.paragraph,
+          attributes: {
+            'delta': [
+              {'insert': ''}
+            ]
+          },
+        ),
+      );
 
-    editorState.selection = savedSelection;
+      editorState.apply(transaction);
+      toolbarState.showInsertMenu = false;
+
+      // Keep cursor in original position
+      editorState.selection = originalSelection;
+    } else {
+      // Normal case: insert at index + 1
+      final transaction = editorState.transaction;
+
+      // Insert the divider
+      transaction.insertNode(
+        Path.from([index + 1]),
+        Node(
+          type: divider.DividerBlockKeys.type,
+          attributes: {
+            'id': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+        ),
+      );
+
+      // Add a paragraph after the divider
+      transaction.insertNode(
+        Path.from([index + 2]),
+        Node(
+          type: BlockTypeConstants.paragraph,
+          attributes: {
+            'delta': [
+              {'insert': ''}
+            ]
+          },
+        ),
+      );
+
+      editorState.apply(transaction);
+      toolbarState.showInsertMenu = false;
+
+      // Keep cursor in original position
+      editorState.selection = originalSelection;
+    }
+
+    // Restore focus
     if (hadFocus && focusNode != null) {
       focusNode!.requestFocus();
     }
   }
 
+  /// Handles inserting related content
+  /// This method will be called when the insert button is tapped
+  /// The actual content insertion will be handled by the callback in the main app
+  void handleInsertRelatedContent() {
+    Log.info('🔍 Insert button tapped - related content functionality');
+    // The main app will handle the bottom sheet and content insertion
+    // This method is a placeholder for future direct insertion logic
+  }
+
   void handleInsertBelow() {
     final selection = editorState.selection;
     if (selection == null) return;
+
     final index = selection.start.path.first;
+    final document = editorState.document;
+
+    // Ensure we don't go out of bounds
+    final insertIndex = index >= document.root.children.length
+        ? document.root.children.length
+        : index + 1;
 
     final hadFocus = focusNode?.hasFocus ?? false;
 
     final transaction = editorState.transaction;
     transaction.insertNode(
-      Path.from([index + 1]),
+      Path.from([insertIndex]),
       Node(
         type: BlockTypeConstants.paragraph,
         attributes: {
@@ -432,7 +493,7 @@ class ToolbarActions {
     );
     editorState.apply(transaction);
     editorState.selection = Selection.single(
-      path: [index + 1],
+      path: [insertIndex],
       startOffset: 0,
     );
 
@@ -716,37 +777,119 @@ class ToolbarActions {
     final node = editorState.getNodeAtPath(selection.start.path);
     if (node == null) return;
 
-    final savedSelection = selection;
     final hadFocus = focusNode?.hasFocus ?? false;
 
     final transaction = editorState.transaction;
     transaction.deleteNode(node);
-    editorState.apply(transaction);
 
-    // Try to select the previous node first, then fall back to next node if no previous exists
-    final parentPath =
-        selection.start.path.sublist(0, selection.start.path.length - 1);
-    final currentIndex = selection.start.path.last;
-    final parentNode = editorState.getNodeAtPath(parentPath);
-
-    if (parentNode != null) {
-      if (currentIndex > 0) {
-        // Select previous node
-        editorState.selection = Selection.single(
-          path: [...parentPath, currentIndex - 1],
-          startOffset: 0,
-        );
-      } else if (currentIndex < parentNode.children.length) {
-        // Select next node if no previous node exists
-        editorState.selection = Selection.single(
-          path: [...parentPath, currentIndex],
-          startOffset: 0,
-        );
+    // Check if this was the last content block (excluding metadata and spacer blocks)
+    int validBlockCount = 0;
+    for (final existingNode in editorState.document.root.children) {
+      if (existingNode != null &&
+          existingNode.type != 'spacer_block' &&
+          existingNode.type != 'metadata_block' &&
+          existingNode != node) {
+        // Don't count the node we're about to delete
+        validBlockCount++;
       }
     }
 
+    // If this was the last content block, insert a new paragraph after metadata
+    if (validBlockCount == 0) {
+      // Find the first non-metadata, non-spacer block to insert after
+      int insertIndex = 0;
+      for (int i = 0; i < editorState.document.root.children.length; i++) {
+        final existingNode = editorState.document.root.children[i];
+        if (existingNode != null &&
+            existingNode.type != 'spacer_block' &&
+            existingNode.type != 'metadata_block') {
+          insertIndex = i + 1; // Insert after this block
+          break;
+        }
+      }
+
+      transaction.insertNode(
+        Path.from([insertIndex]),
+        Node(
+          type: BlockTypeConstants.paragraph,
+          attributes: {
+            'delta': [
+              {'insert': ''}
+            ]
+          },
+        ),
+      );
+    }
+
+    editorState.apply(transaction);
+
+    // After deletion, safely select a nearby block
+    _selectSafeBlockAfterDeletion();
+
     if (hadFocus && focusNode != null) {
       focusNode!.requestFocus();
+    }
+  }
+
+  void _selectSafeBlockAfterDeletion() {
+    try {
+      final document = editorState.document;
+      if (document.root.children.isEmpty) {
+        editorState.selection = null;
+        return;
+      }
+
+      // Try to find a safe block to select
+      for (int i = 0; i < document.root.children.length; i++) {
+        try {
+          final existingNode = document.root.children[i];
+          if (existingNode != null &&
+              existingNode.type != 'spacer_block' &&
+              existingNode.type != 'metadata_block') {
+            // Double-check that this path is actually valid
+            final testPath = [i];
+            final testNode = editorState.getNodeAtPath(testPath);
+            if (testNode != null) {
+              // Select this block safely
+              editorState.selection = Selection.single(
+                path: testPath,
+                startOffset: 0,
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          // If there's any error with this index, continue to the next one
+          continue;
+        }
+      }
+
+      // If no safe block found, try to select the first available block regardless of type
+      for (int i = 0; i < document.root.children.length; i++) {
+        try {
+          final existingNode = document.root.children[i];
+          if (existingNode != null) {
+            final testPath = [i];
+            final testNode = editorState.getNodeAtPath(testPath);
+            if (testNode != null) {
+              editorState.selection = Selection.single(
+                path: testPath,
+                startOffset: 0,
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          // If there's any error with this index, continue to the next one
+          continue;
+        }
+      }
+
+      // If still no block found, clear selection
+      editorState.selection = null;
+    } catch (e) {
+      // If anything goes wrong, just clear selection to prevent crashes
+      editorState.selection = null;
     }
   }
 
@@ -920,10 +1063,8 @@ class ToolbarActions {
     }
     editorState.apply(transaction);
 
-    // Clear the clipboard and update toolbar state
-    await Clipboard.setData(const ClipboardData(text: ''));
-    toolbarState.hasClipboardContent = false;
-    toolbarState.notifyListeners();
+    // Don't clear the clipboard - let the system manage it
+    // Don't update toolbar state - let it check system clipboard on demand
 
     // Restore selection and focus
     editorState.selection = savedSelection;

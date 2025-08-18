@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
 import '../theme/journal_theme.dart';
+import '../editor/editor_globals.dart';
 
 /// Metadata block builder to display title and created date
 class MetadataBlockBuilder extends BlockComponentBuilder {
@@ -117,7 +118,7 @@ class MetadataBlockWidget extends StatelessWidget
                 titleController.text,
                 textAlign: TextAlign.left,
                 style: TextStyle(
-                  fontSize: 24.0,
+                  fontSize: JournalEditorTheme.titleFontSize,
                   fontWeight: FontWeight.w700,
                   color: theme.primaryText,
                   height: 1.5,
@@ -132,13 +133,13 @@ class MetadataBlockWidget extends StatelessWidget
                   border: InputBorder.none,
                   hintStyle: TextStyle(
                     color: theme.secondaryText,
-                    fontSize: 24.0,
+                    fontSize: JournalEditorTheme.titleFontSize,
                   ),
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
                 ),
                 style: TextStyle(
-                  fontSize: 24.0,
+                  fontSize: JournalEditorTheme.titleFontSize,
                   fontWeight: FontWeight.w700,
                   color: theme.primaryText,
                   height: 1.5,
@@ -190,7 +191,7 @@ class MetadataBlockWidget extends StatelessWidget
             Text(
               '$formattedDate',
               style: TextStyle(
-                fontSize: 14.0,
+                fontSize: JournalEditorTheme.smallFontSize,
                 color: theme.secondaryText,
                 height: 1.5,
               ),

@@ -9,6 +9,7 @@ import 'package:journal_core/src/blocks/divider_block.dart' as divider;
 import 'package:journal_core/src/blocks/quote_block.dart' as quote;
 import '../theme/journal_theme.dart';
 import '../models/journal.dart';
+import '../editor/editor_globals.dart';
 
 /// Custom block component builder for custom block renderers
 class CustomBlockComponentBuilder extends BlockComponentBuilder {
@@ -302,7 +303,7 @@ class ReorderableEditorState extends State<ReorderableEditor> {
 
     // Base style for fallback rendering
     final baseStyle = TextStyle(
-      fontSize: 16,
+      fontSize: JournalEditorTheme.defaultFontSize,
       height: 1.5,
       color: textColor,
     );
@@ -503,7 +504,9 @@ class ReorderableEditorState extends State<ReorderableEditor> {
               padding: const EdgeInsets.all(16.0),
               child: Text(
                 'No blocks to reorder.',
-                style: TextStyle(fontSize: 16, color: theme.secondaryText),
+                style: TextStyle(
+                    fontSize: JournalEditorTheme.defaultFontSize,
+                    color: theme.secondaryText),
               ),
             ),
         ],

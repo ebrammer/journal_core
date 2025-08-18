@@ -1,24 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:journal_core/journal_core.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
-import '../editor/editor_globals.dart' as globals;
-import '../models/block_type_constants.dart';
-import '../models/journal.dart';
-import '../theme/journal_theme.dart';
-import '../toolbar/toolbar_state.dart';
-import '../toolbar/toolbar_widget.dart';
-import '../utils/logging.dart';
+import 'package:journal_core/journal_core.dart';
 import 'package:journal_core/src/utils/focus_helpers.dart';
 import 'package:journal_core/src/blocks/divider_block.dart' as divider;
-import '../models/journal.dart';
-import '../editor/journal_editor_controller.dart';
-import '../toolbar/toolbar_state.dart';
-import '../toolbar/toolbar_widget.dart';
-import '../utils/logging.dart';
-import 'package:journal_core/src/blocks/quote_block.dart' as quote;
+import '../editor/editor_globals.dart' as globals;
+import '../theme/journal_theme.dart';
 
 class EditorWidget extends StatefulWidget {
   const EditorWidget({
@@ -28,9 +16,7 @@ class EditorWidget extends StatefulWidget {
     this.onSave,
     this.onBack,
     this.onDelete,
-    this.onPrayer,
-    this.onScripture,
-    this.onTag,
+    this.onRelated, // New callback for related content
     this.onShare,
     this.readOnly = false,
     this.onContentTap,
@@ -43,9 +29,8 @@ class EditorWidget extends StatefulWidget {
       Journal updatedJournal, String contentJson, String? journalID)? onSave;
   final Future Function(String? journalID)? onBack;
   final Future Function()? onDelete;
-  final Future Function()? onPrayer;
-  final Future Function()? onScripture;
-  final Future Function()? onTag;
+  final Future Function(RelatedContent content, RelatedContentDisplay display)?
+      onRelated; // New callback for related content
   final Future Function(String selectedText)? onShare;
   final bool readOnly;
   final Future<void> Function()? onContentTap;
@@ -400,7 +385,6 @@ class _EditorWidgetState extends State<EditorWidget> {
               blockComponentBuilders: {
                 ...standardBlockComponentBuilderMap,
                 'spacer_block': spacerBlockBuilder,
-                quote.QuoteBlockKeys.type: quote.quoteBlockBuilder,
                 'metadata_block': MetadataBlockBuilder(
                   titleController: titleController,
                   createdAt: widget.journal.createdAt,
@@ -448,7 +432,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                 cursorColor: theme.primaryText,
                 textStyleConfiguration: TextStyleConfiguration(
                   text: TextStyle(
-                    fontSize: 16,
+                    fontSize: globals.JournalEditorTheme.defaultFontSize,
                     height: 1.5,
                     color: theme.primaryText,
                   ),
@@ -562,7 +546,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                               child: Text(
                                 _currentTitle.isEmpty ? 'Title' : _currentTitle,
                                 style: TextStyle(
-                                  fontSize: 16.0,
+                                  fontSize: globals
+                                      .JournalEditorTheme.defaultFontSize,
                                   fontWeight: FontWeight.w400,
                                   color: theme.primaryText,
                                   letterSpacing: 0.5,
@@ -644,7 +629,8 @@ class _EditorWidgetState extends State<EditorWidget> {
                               child: const Text(
                                 'Save',
                                 style: TextStyle(
-                                  fontSize: 14.0,
+                                  fontSize:
+                                      globals.JournalEditorTheme.smallFontSize,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -706,9 +692,7 @@ class _EditorWidgetState extends State<EditorWidget> {
                               .moveBlock(_selectedBlockPath![0], 1);
                         }
                       },
-                      onPrayer: widget.onPrayer,
-                      onScripture: widget.onScripture,
-                      onTag: widget.onTag,
+                      onRelated: widget.onRelated,
                       onShare: widget.onShare,
                     ),
                 ],
@@ -727,13 +711,116 @@ class _EditorWidgetState extends State<EditorWidget> {
   void _deleteDivider(Node node) {
     final transaction = _editorState.transaction;
     transaction.deleteNode(node);
+
+    // Check if this was the last content block (excluding metadata and spacer blocks)
+    int validBlockCount = 0;
+    for (final existingNode in _editorState.document.root.children) {
+      if (existingNode != null &&
+          existingNode.type != 'spacer_block' &&
+          existingNode.type != 'metadata_block' &&
+          existingNode != node) {
+        // Don't count the node we're about to delete
+        validBlockCount++;
+      }
+    }
+
+    // If this was the last content block, insert a new paragraph after metadata
+    if (validBlockCount == 0) {
+      // Find the first non-metadata, non-spacer block to insert after
+      int insertIndex = 0;
+      for (int i = 0; i < _editorState.document.root.children.length; i++) {
+        final existingNode = _editorState.document.root.children[i];
+        if (existingNode != null &&
+            existingNode.type != 'spacer_block' &&
+            existingNode.type != 'metadata_block') {
+          insertIndex = i + 1; // Insert after this block
+          break;
+        }
+      }
+
+      transaction.insertNode(
+        Path.from([insertIndex]),
+        Node(
+          type: BlockTypeConstants.paragraph,
+          attributes: {
+            'delta': [
+              {'insert': ''}
+            ]
+          },
+        ),
+      );
+    }
+
     try {
       _editorState.apply(transaction);
-      _editorState.selection = null;
+
+      // After deletion, safely select a nearby block
+      _selectSafeBlockAfterDeletion();
+
       _onDocumentChanged();
     } catch (e, stackTrace) {
       Log.error(
           '[EditorWidget._deleteDivider] Failed to delete divider: $e\n$stackTrace');
+    }
+  }
+
+  void _selectSafeBlockAfterDeletion() {
+    try {
+      final document = _editorState.document;
+      if (document.root.children.isEmpty) {
+        _editorState.selection = null;
+        return;
+      }
+
+      // Try to find a safe block to select
+      for (int i = 0; i < document.root.children.length; i++) {
+        try {
+          final existingNode = document.root.children[i];
+          if (existingNode != null &&
+              existingNode.type != 'spacer_block' &&
+              existingNode.type != 'metadata_block') {
+            // Double-check that this path is actually valid
+            final testPath = [i];
+            final testNode = _editorState.getNodeAtPath(testPath);
+            if (testNode != null) {
+              // Select this block safely
+              _editorState.selection = Selection.collapsed(
+                Position(path: testPath, offset: 0),
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          // If there's any error with this index, continue to the next one
+          continue;
+        }
+      }
+
+      // If no safe block found, try to select the first available block regardless of type
+      for (int i = 0; i < document.root.children.length; i++) {
+        try {
+          final existingNode = document.root.children[i];
+          if (existingNode != null) {
+            final testPath = [i];
+            final testNode = _editorState.getNodeAtPath(testPath);
+            if (testNode != null) {
+              _editorState.selection = Selection.collapsed(
+                Position(path: testPath, offset: 0),
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          // If there's any error with this index, continue to the next one
+          continue;
+        }
+      }
+
+      // If still no block found, clear selection
+      _editorState.selection = null;
+    } catch (e) {
+      // If anything goes wrong, just clear selection to prevent crashes
+      _editorState.selection = null;
     }
   }
 

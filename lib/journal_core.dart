@@ -18,6 +18,7 @@ export 'src/models/block_model.dart';
 export 'src/models/styled_span.dart';
 export 'src/models/journal.dart';
 export 'src/models/block_type_constants.dart';
+export 'src/models/related_content.dart';
 
 // Export toolbar
 export 'src/toolbar/toolbar.dart';

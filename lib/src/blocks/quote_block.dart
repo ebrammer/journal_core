@@ -101,7 +101,7 @@ class _QuoteBlockComponentWidgetState extends State<QuoteBlockComponentWidget> {
       final attributes = op['attributes'] as Map<String, dynamic>? ?? {};
 
       TextStyle style = TextStyle(
-        fontSize: 16,
+        fontSize: JournalEditorTheme.defaultFontSize,
         height: 1.5,
         color: theme.primaryText,
       );

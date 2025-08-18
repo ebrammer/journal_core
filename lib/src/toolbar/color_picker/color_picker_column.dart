@@ -4,6 +4,7 @@ import 'package:journal_core/src/toolbar/color_picker/color_picker_constants.dar
 import 'package:journal_core/src/toolbar/color_picker/color_picker_widgets.dart'
     as picker;
 import 'package:journal_core/src/theme/journal_theme.dart';
+import '../../editor/editor_globals.dart';
 
 class ColorPickerColumn extends StatefulWidget {
   final EditorState editorState;
@@ -118,7 +119,7 @@ class _ColorPickerColumnState extends State<ColorPickerColumn> {
                         'Underline',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white70 : Colors.black87,
-                          fontSize: 14,
+                          fontSize: JournalEditorTheme.smallFontSize,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -247,7 +248,7 @@ class _ColorPickerColumnState extends State<ColorPickerColumn> {
                     'Text',
                     style: TextStyle(
                       color: isDarkMode ? Colors.white70 : Colors.black87,
-                      fontSize: 14,
+                      fontSize: JournalEditorTheme.smallFontSize,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -283,7 +284,7 @@ class _ColorPickerColumnState extends State<ColorPickerColumn> {
                     'Background',
                     style: TextStyle(
                       color: isDarkMode ? Colors.white70 : Colors.black87,
-                      fontSize: 14,
+                      fontSize: JournalEditorTheme.smallFontSize,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

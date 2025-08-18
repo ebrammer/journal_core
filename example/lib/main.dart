@@ -227,14 +227,11 @@ class EditorScreen extends StatelessWidget {
             Navigator.of(context).pop();
           }
         },
-        onPrayer: () async {
-          debugPrint("Adding prayer block");
-        },
-        onScripture: () async {
-          debugPrint("Adding scripture block");
-        },
-        onTag: () async {
-          debugPrint("Adding tag");
+        onRelated: (content, display) async {
+          debugPrint(
+              "Adding related content: ${content.title} with display: $display");
+          // In a real app, this would show a bottom sheet to select related content
+          // and then insert it into the editor based on the display parameter
         },
         onContentTap: () async {
           debugPrint("🔍 onContentTap callback triggered!");

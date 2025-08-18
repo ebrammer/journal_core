@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:journal_core/src/toolbar/color_picker/color_picker_constants.dart';
+import '../../editor/editor_globals.dart';
 
 /// A bottom sheet widget for picking colors
 class ColorPickerBottomSheet extends StatefulWidget {
@@ -273,7 +274,7 @@ class _ColorPickerBottomSheetState extends State<ColorPickerBottomSheet> {
                         'Color Options',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white : Colors.black,
-                          fontSize: 20,
+                          fontSize: JournalEditorTheme.titleFontSize,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -283,7 +284,7 @@ class _ColorPickerBottomSheetState extends State<ColorPickerBottomSheet> {
                           'Done',
                           style: TextStyle(
                             color: isDarkMode ? Colors.white : Colors.black,
-                            fontSize: 16,
+                            fontSize: JournalEditorTheme.defaultFontSize,
                           ),
                         ),
                       ),
@@ -311,7 +312,7 @@ class _ColorPickerBottomSheetState extends State<ColorPickerBottomSheet> {
                             style: TextStyle(
                               color:
                                   isDarkMode ? Colors.white70 : Colors.black87,
-                              fontSize: 14,
+                              fontSize: JournalEditorTheme.smallFontSize,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -439,7 +440,7 @@ class _ColorPickerBottomSheetState extends State<ColorPickerBottomSheet> {
                         'Text',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white70 : Colors.black87,
-                          fontSize: 14,
+                          fontSize: JournalEditorTheme.smallFontSize,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -526,7 +527,7 @@ class _ColorPickerBottomSheetState extends State<ColorPickerBottomSheet> {
                         'Background',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white70 : Colors.black87,
-                          fontSize: 14,
+                          fontSize: JournalEditorTheme.smallFontSize,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

@@ -167,6 +167,27 @@ class ToolbarButtons {
               ? null
               : () => actions.handleCycleAlignment(),
         ),
+      ToolbarButtonConfig(
+        key: 'insert_above',
+        icon: JournalIcons.jrowsPlusTop,
+        onPressed:
+            toolbarState.isDragMode ? null : () => actions.handleInsertAbove(),
+      ),
+      ToolbarButtonConfig(
+        key: 'insert_below',
+        icon: JournalIcons.jrowsPlusBottom,
+        onPressed:
+            toolbarState.isDragMode ? null : () => actions.handleInsertBelow(),
+      ),
+      ToolbarButtonConfig(
+        key: BlockTypeConstants.divider,
+        icon: JournalIcons.jminus,
+        onPressed: toolbarState.isDragMode
+            ? null
+            : () => actions.handleInsertDivider(),
+        isActive: () =>
+            toolbarState.currentBlockType == BlockTypeConstants.divider,
+      ),
       // ToolbarButtonConfig(
       //   key: 'undo',
       //   icon: JournalIcons.jarrowArcLeft,
@@ -186,23 +207,6 @@ class ToolbarButtons {
 
   List<ToolbarButtonConfig> getInsertButtons() {
     return [
-      ToolbarButtonConfig(
-        key: 'insert_above',
-        icon: JournalIcons.jrowsPlusTop,
-        onPressed: () => actions.handleInsertAbove(),
-      ),
-      ToolbarButtonConfig(
-        key: 'insert_below',
-        icon: JournalIcons.jrowsPlusBottom,
-        onPressed: () => actions.handleInsertBelow(),
-      ),
-      ToolbarButtonConfig(
-        key: BlockTypeConstants.divider,
-        icon: JournalIcons.jminus,
-        onPressed: () => actions.handleInsertDivider(),
-        isActive: () =>
-            toolbarState.currentBlockType == BlockTypeConstants.divider,
-      ),
       ToolbarButtonConfig(
         key: 'actions',
         icon: JournalIcons.jdotsThree,

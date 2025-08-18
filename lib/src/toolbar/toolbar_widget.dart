@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:journal_core/journal_core.dart';
 import '../theme/journal_theme.dart';
 import 'package:flutter/rendering.dart';
+import '../editor/editor_globals.dart';
+import '../models/related_content.dart';
 
 /// The toolbar widget for the journal editor, displaying formatting and reordering options.
 /// - Enhances drag submenu to include move up/down buttons alongside "Long press and drag to reorder" message.
@@ -24,9 +26,7 @@ class JournalToolbar extends StatefulWidget {
     this.onDocumentChanged, // Callback for document changes
     this.onMoveUp,
     this.onMoveDown,
-    this.onPrayer,
-    this.onScripture,
-    this.onTag,
+    this.onRelated, // New callback for related content
     this.onShare,
   });
 
@@ -37,9 +37,8 @@ class JournalToolbar extends StatefulWidget {
   final VoidCallback? onDocumentChanged;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
-  final Future Function()? onPrayer;
-  final Future Function()? onScripture;
-  final Future Function()? onTag;
+  final Future Function(RelatedContent content, RelatedContentDisplay display)?
+      onRelated; // New callback for related content
   final Future Function(String selectedText)? onShare;
 
   @override
@@ -110,7 +109,10 @@ class _JournalToolbarState extends State<JournalToolbar> {
                       (widget.editorState.selection != null &&
                           !widget.editorState.selection!.isCollapsed) ||
                       toolbarState.isDragMode ||
-                      toolbarState.showColorPicker
+                      toolbarState.showColorPicker ||
+                      (toolbarState.hasClipboardContent &&
+                          (widget.editorState.selection == null ||
+                              widget.editorState.selection!.isCollapsed))
                   ? Alignment.center
                   : Alignment.centerLeft,
               child: Container(
@@ -125,13 +127,23 @@ class _JournalToolbarState extends State<JournalToolbar> {
                                 BlockTypeConstants.divider) ||
                             (widget.editorState.selection != null &&
                                 !widget.editorState.selection!.isCollapsed) ||
-                            toolbarState.isDragMode
+                            toolbarState.isDragMode ||
+                            (toolbarState.hasClipboardContent &&
+                                (widget.editorState.selection == null ||
+                                    widget.editorState.selection!.isCollapsed))
                         ? MainAxisAlignment.center
                         : MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(width: 8.0),
+                      if (!((toolbarState.currentBlockType ==
+                              BlockTypeConstants.divider) ||
+                          (widget.editorState.selection != null &&
+                              !widget.editorState.selection!.isCollapsed) ||
+                          toolbarState.isDragMode ||
+                          (toolbarState.hasClipboardContent &&
+                              widget.editorState.selection == null)))
+                        const SizedBox(width: 8.0),
                       if (toolbarState.isDragMode) ...[
                         // Count valid blocks (excluding metadata and spacer blocks)
                         Builder(
@@ -150,7 +162,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
                             if (validBlockCount > 1) {
                               return _buildInsertPill(
                                 icon: JournalIcons.jxCircle,
-                                label: 'Delete Block',
+                                label: 'Delete',
                                 onTap: () => _actions.handleDelete(),
                               );
                             }
@@ -179,37 +191,28 @@ class _JournalToolbarState extends State<JournalToolbar> {
                         ),
                         const SizedBox(width: 8),
                         _buildInsertPill(
+                          icon: JournalIcons.jxCircle,
+                          label: 'Delete',
+                          onTap: () => _actions.handleDelete(),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInsertPill(
                           icon: JournalIcons.jshare,
                           label: 'Share',
                           onTap: () => _handleShare(),
                         ),
                       ] else ...[
-                        if (toolbarState.hasClipboardContent)
-                          _buildInsertPill(
-                            icon: JournalIcons.jclipboard,
-                            label: 'Paste',
-                            onTap: () => _actions.handlePasteFromClipboard(),
-                          ),
-                        if (toolbarState.hasClipboardContent)
-                          const SizedBox(width: 8),
+                        // Always show insert and delete buttons, conditionally show paste
                         _buildInsertPill(
-                          icon: JournalIcons.jminus,
-                          label: 'Divider',
-                          onTap: () => _actions.handleInsertDivider(),
-                          isActive: toolbarState.currentBlockType ==
-                              BlockTypeConstants.divider,
+                          icon: JournalIcons.jclipboard,
+                          label: 'Paste',
+                          onTap: () => _actions.handlePasteFromClipboard(),
                         ),
                         const SizedBox(width: 8),
                         _buildInsertPill(
-                          icon: JournalIcons.jrowsPlusTop,
-                          label: 'Insert Above',
-                          onTap: () => _actions.handleInsertAbove(),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildInsertPill(
-                          icon: JournalIcons.jrowsPlusBottom,
-                          label: 'Insert Below',
-                          onTap: () => _actions.handleInsertBelow(),
+                          icon: JournalIcons.jxCircle,
+                          label: 'Delete',
+                          onTap: () => _actions.handleDelete(),
                         ),
                       ],
                       const SizedBox(width: 8.0),
@@ -355,7 +358,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
           'Long press and drag to reorder',
           style: TextStyle(
             color: theme.secondaryText,
-            fontSize: 14,
+            fontSize: JournalEditorTheme.smallFontSize,
           ),
         ),
       ];
@@ -488,7 +491,7 @@ class _JournalToolbarState extends State<JournalToolbar> {
               label,
               style: TextStyle(
                 color: theme.primaryText,
-                fontSize: 12.0,
+                fontSize: JournalEditorTheme.tinyFontSize,
               ),
             ),
           ],

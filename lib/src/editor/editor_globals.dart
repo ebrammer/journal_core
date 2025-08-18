@@ -17,6 +17,12 @@ class EditorGlobals {
 
 /// Theme configuration for the editor
 class JournalEditorTheme {
+  // Font sizes
+  static const double defaultFontSize = 18.0;
+  static const double titleFontSize = 24.0;
+  static const double smallFontSize = 16.0;
+  static const double tinyFontSize = 14.0;
+
   // Default colors
   static const Color primaryTextColor = Color(0xFF333333);
   static const Color secondaryTextColor = Color(0xFF666666);
@@ -50,18 +56,18 @@ class JournalEditorTheme {
 
   // Text styles
   static const TextStyle defaultTextStyle = TextStyle(
-    fontSize: 16.0,
+    fontSize: defaultFontSize,
     color: primaryTextColor,
   );
 
   static const TextStyle boldTextStyle = TextStyle(
-    fontSize: 16.0,
+    fontSize: defaultFontSize,
     fontWeight: FontWeight.bold,
     color: primaryTextColor,
   );
 
   static const TextStyle italicTextStyle = TextStyle(
-    fontSize: 16.0,
+    fontSize: defaultFontSize,
     fontStyle: FontStyle.italic,
     color: secondaryTextColor,
   );
@@ -103,12 +109,12 @@ class BlockTheme {
 
   TextStyle get textStyle => TextStyle(
         color: textColor,
-        fontSize: 16,
+        fontSize: JournalEditorTheme.defaultFontSize,
       );
 
   TextStyle get boldTextStyle => TextStyle(
         color: textColor,
-        fontSize: 16,
+        fontSize: JournalEditorTheme.defaultFontSize,
         fontWeight: FontWeight.bold,
       );
 }
